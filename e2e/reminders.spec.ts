@@ -5,7 +5,6 @@ import {
   seedPlaylist,
   routePlaylist,
   routeLiveManifest,
-  showHome,
   PLAYLIST_URL,
   type Page,
 } from './helpers';
@@ -29,13 +28,15 @@ async function seedDueReminder(page: Page): Promise<void> {
   }, channelKey(CHAN_ONE));
 }
 
-test('a due reminder prompts on open and Watch now opens the player', async ({ page }) => {
+// A reminder that comes due after launch prompts once Live loads its channels.
+test('a reminder due by the time Live opens prompts there, and Watch now plays', async ({ page }) => {
   await routePlaylist(page);
   await routeLiveManifest(page);
   await seedPlaylist(page);
-  await seedDueReminder(page);
+  await seedReminderDueSoon(page);
 
   await page.goto('/');
+  await openLiveOnceDue(page);
 
   await expect(page.locator('.reminder-prompt:not(.hidden)')).toBeVisible();
   await expect(page.locator('.reminder-message')).toContainText('Alpha');
@@ -44,12 +45,29 @@ test('a due reminder prompts on open and Watch now opens the player', async ({ p
   await expect(page.locator('#view-player')).toBeVisible();
 });
 
+// Not yet due at launch, so Home loads no channels for it; due by the time
+// Live loads them, which prompts.
+async function seedReminderDueSoon(page: Page): Promise<void> {
+  await page.addInitScript((k) => {
+    const now = Date.now();
+    localStorage.setItem('iptv_reminders', JSON.stringify([
+      { channelKey: k, channelName: 'Channel One', title: 'Alpha', startMs: now + 1500, stopMs: now + 3600000 },
+    ]));
+  }, channelKey(CHAN_ONE));
+}
+
+async function openLiveOnceDue(page: Page): Promise<void> {
+  await expect(page.locator('#view-home [data-key="section:live"].focused')).toBeVisible();
+  await page.waitForTimeout(2000);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#view-channels')).toBeVisible();
+}
+
 test('a due reminder on Home loads the channels for its prompt, and Watch now plays', async ({ page }) => {
   await routePlaylist(page);
   await routeLiveManifest(page);
   await seedPlaylist(page);
   await seedDueReminder(page);
-  await showHome(page);
 
   await page.goto('/');
   await expect(page.locator('#view-home')).toBeVisible();
@@ -71,7 +89,6 @@ test('Home keeps a later reminder without loading the channels', async ({ page }
       { channelKey: k, channelName: 'Channel One', title: 'Alpha', startMs: now + 3600000, stopMs: now + 7200000 },
     ]));
   }, channelKey(CHAN_ONE));
-  await showHome(page);
 
   await page.goto('/');
   await expect(page.locator('#view-home')).toBeVisible();
@@ -86,9 +103,10 @@ test('Cancel dismisses the prompt and stays on the channel list', async ({ page 
   await routePlaylist(page);
   await routeLiveManifest(page);
   await seedPlaylist(page);
-  await seedDueReminder(page);
+  await seedReminderDueSoon(page);
 
   await page.goto('/');
+  await openLiveOnceDue(page);
   await expect(page.locator('.reminder-prompt:not(.hidden)')).toBeVisible();
   await page.locator('.reminder-btn[data-reminder-action="cancel"]').click();
   await expect(page.locator('.reminder-prompt.hidden')).toHaveCount(1);
@@ -242,15 +260,16 @@ test('the empty-state hint wraps to a readable width at text size 150', async ({
   expect(Math.abs((box.left + box.right) / 2 - 960)).toBeLessThan(2);
 });
 
-// Regression: the preview's dwell tuned the focused row under a boot-time
-// reminder, so whether it played depended on timing.
+// Regression: the preview's dwell tuned the focused row under a reminder
+// prompted as Live loaded, so whether it played depended on timing.
 test('the Live preview waits under a reminder prompt and tunes once it is canceled', async ({ page }) => {
   await routePlaylist(page);
   await routeLiveManifest(page);
   await seedPlaylist(page);
-  await seedDueReminder(page);
+  await seedReminderDueSoon(page);
 
   await page.goto('/');
+  await openLiveOnceDue(page);
   await expect(page.locator('.reminder-prompt:not(.hidden)')).toBeVisible();
   await expect(page.locator('#view-channels .channel-item').first()).toBeVisible();
   // Well past the dwell: nothing tunes under the prompt.

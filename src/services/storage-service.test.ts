@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Channel } from '../types';
 import {
   NUMBER_ENTRY_OSD_TIMEOUT_MS_OPTIONS,
   LIVE_RECONNECT_ATTEMPT_OPTIONS,
@@ -10,18 +9,12 @@ import {
   StorageService,
   XTREAM_CATALOG_REFRESH_HOUR_OPTIONS,
 } from './storage-service';
-import { channelKey, legacyChannelKey } from '../utils/channel';
 import { CONFIG } from '../config';
 import {
   clearAllCachedData,
   getCachedStreamMime,
   setCachedStreamMime,
 } from './idb-cache';
-
-const ch = (over: Partial<Channel>): Channel => ({
-  id: '', name: '', logo: '', group: '', url: '', extras: null,
-  playlistIds: [], catchup: '', catchupSource: '', catchupDays: 0, ...over,
-});
 
 describe('StorageService', () => {
   beforeEach(async () => {
@@ -280,14 +273,7 @@ describe('StorageService', () => {
     ]);
   });
 
-  it('migrates the legacy EPG URL and sanitizes manual EPG sources', () => {
-    localStorage.setItem('iptv_epg_url', JSON.stringify('http://host/legacy.xml'));
-    expect(StorageService.getManualEpgSources()).toEqual([
-      { url: 'http://host/legacy.xml', playlistIds: [] },
-    ]);
-    expect(localStorage.getItem('iptv_epg_url')).toBeNull();
-    expect(localStorage.getItem('iptv_manual_epg_sources')).not.toBeNull();
-
+  it('sanitizes manual EPG sources', () => {
     StorageService.setManualEpgSources([
       { url: ' http://host/a.xml ', playlistIds: ['p1', 'p1'] },
       { url: 'http://host/a.xml', playlistIds: ['p2'] },
@@ -365,72 +351,6 @@ describe('StorageService', () => {
     ]);
     const prefixed = Object.keys(localStorage).filter(k => k.startsWith('iptv_'));
     expect(prefixed.length).toBeGreaterThan(0);
-  });
-
-  describe('favorite key migration', () => {
-    it('re-keys legacy favorites (id||name) to channelKey, then is idempotent', () => {
-      StorageService.setFavorites(['fav1', 'fav2']); // legacy keys
-      const channels = [ch({ id: 'fav1', url: 'http://host/a' }), ch({ name: 'fav2', url: 'http://host/b' })];
-      StorageService.migrateFavoriteKeys(channels);
-      expect(StorageService.getFavorites()).toEqual([
-        channelKey(channels[0]),
-        channelKey(channels[1]),
-      ]);
-
-      // A second call must not touch favorites again (flag set).
-      StorageService.setFavorites(['untouched']);
-      StorageService.migrateFavoriteKeys(channels);
-      expect(StorageService.getFavorites()).toEqual(['untouched']);
-    });
-
-    it('waits for channels before migrating (and does not set the flag)', () => {
-      StorageService.setFavorites(['fav1']);
-      StorageService.migrateFavoriteKeys([]); // no channels yet → no-op
-      expect(StorageService.getFavorites()).toEqual(['fav1']);
-
-      const channels = [ch({ id: 'fav1', url: 'http://host/a' })];
-      StorageService.migrateFavoriteKeys(channels);
-      expect(StorageService.getFavorites()).toEqual([channelKey(channels[0])]);
-    });
-
-    it('drops a legacy favorite whose channel is no longer present', () => {
-      StorageService.setFavorites(['gone']);
-      StorageService.migrateFavoriteKeys([ch({ id: 'fav1', url: 'http://host/a' })]);
-      expect(StorageService.getFavorites()).toEqual([]);
-    });
-
-    it('migrates a unique query-stripped key to the query-aware stream key', () => {
-      const channel = ch({ url: 'http://host/a?id=1' });
-      StorageService.setFavorites([legacyChannelKey(channel)]);
-      StorageService.set('fav_url_keyed', true);
-
-      StorageService.migrateFavoriteKeys([channel]);
-
-      expect(StorageService.getFavorites()).toEqual([channelKey(channel)]);
-    });
-
-    it('preserves every channel matched by an ambiguous query-stripped key', () => {
-      const channels = [
-        ch({ url: 'http://host/a?id=1' }),
-        ch({ url: 'http://host/a?id=2' }),
-      ];
-      StorageService.setFavorites([legacyChannelKey(channels[0])]);
-      StorageService.set('fav_url_keyed', true);
-
-      StorageService.migrateFavoriteKeys(channels);
-
-      expect(StorageService.getFavorites()).toEqual(channels.map(channelKey));
-    });
-
-    it('preserves already-migrated keys when the completion flag is missing', () => {
-      const channel = ch({ url: 'http://host/a?id=1' });
-      StorageService.setFavorites([channelKey(channel)]);
-      StorageService.set('fav_url_keyed', true);
-
-      StorageService.migrateFavoriteKeys([channel]);
-
-      expect(StorageService.getFavorites()).toEqual([channelKey(channel)]);
-    });
   });
 
   describe('audio preferences', () => {
@@ -1322,11 +1242,15 @@ describe('StorageService channel customization store', () => {
     expect(StorageService.getChannelCustomization()).toBeNull();
   });
 
-  it('round-trips the last channel keys and the show-hidden toggle', () => {
-    expect(StorageService.getLastChannelKey()).toBe('');
-    StorageService.setLastChannelKey('k1');
-    expect(StorageService.getLastChannelKey()).toBe('k1');
+  it('defaults Channel Up/Down to the current group and keeps a stored choice', () => {
+    expect(StorageService.getChannelCycleMode()).toBe('active');
+    localStorage.setItem('iptv_channel_cycle_mode', JSON.stringify('global'));
+    expect(StorageService.getChannelCycleMode()).toBe('global');
+    StorageService.setChannelCycleMode('active');
+    expect(StorageService.getChannelCycleMode()).toBe('active');
+  });
 
+  it('round-trips the show-hidden toggle', () => {
     expect(StorageService.getShowHiddenChannels()).toBe(false);
     StorageService.setShowHiddenChannels(true);
     expect(StorageService.getShowHiddenChannels()).toBe(true);

@@ -1,6 +1,9 @@
 import { test, expect, enterTab, type Page } from './helpers';
 import { THEMES } from '../src/config/themes';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 async function seedCatalog(page: Page): Promise<void> {
   await page.route('**/get.php*', route => route.fulfill({
     contentType: 'application/x-mpegurl',

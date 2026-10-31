@@ -369,8 +369,8 @@ export interface ChannelScope {
   playlist?: string;
 }
 
-/** Whether channel_up/channel_down cycles the entire channel list ('global',
- *  the default) or stays within the launch scope above ('active'). */
+/** Whether channel_up/channel_down cycles the entire channel list ('global')
+ *  or stays within the launch scope above ('active', the default). */
 export type ChannelCycleMode = 'global' | 'active';
 
 export type NavDirection = 'up' | 'down' | 'left' | 'right';

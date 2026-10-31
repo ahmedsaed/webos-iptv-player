@@ -1,6 +1,9 @@
 import { test, expect, routeLiveManifest, SAMPLE_M3U, enterTab, type Page, pressAndReadPlayer } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // Online-subtitle search for Xtream VOD. The player's "Search online…" subtitle
 // entry (always present for VOD — Assrt is a zero-config provider) opens a
 // results overlay backed by the aggregator. We route the Assrt API so the whole

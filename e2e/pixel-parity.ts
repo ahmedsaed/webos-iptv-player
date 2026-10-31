@@ -18,8 +18,6 @@ export async function newLegacyPage(browser: Browser): Promise<{ page: Page; clo
   const page = await context.newPage();
   await page.addInitScript(removeApis, POST_TARGET_APIS);
   await stubUploadService(page);
-  // Mirror the main fixture: launching on Live.
-  await page.addInitScript(() => localStorage.setItem('iptv_start_on_live', 'true'));
   return { page, close: () => context.close() };
 }
 

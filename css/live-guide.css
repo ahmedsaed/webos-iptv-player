@@ -114,6 +114,11 @@
   height: calc(80px * var(--font-scale));
 }
 
+/* Show hidden channels: dimmed like the Live list's rows. */
+.guide-row.hidden-entry {
+  opacity: 0.45;
+}
+
 .guide-channel {
   flex: 0 0 300px;
   display: flex;

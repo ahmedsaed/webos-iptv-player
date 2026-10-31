@@ -1,4 +1,4 @@
-import { test, expect, showHome, enterTab, routeLiveManifest, pressKeys, type Page } from './helpers';
+import { test, expect, enterTab, routeLiveManifest, pressKeys, type Page } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
 // Back goes up one level, from every page's own steps to its section, from the
@@ -19,7 +19,6 @@ async function boot(page: Page): Promise<void> {
   });
   await seedXtream(page);
   await routeLiveManifest(page);
-  await showHome(page);
   await page.goto('/');
   await expect(homeFocus(page)).toHaveAttribute('data-section', 'live');
 }

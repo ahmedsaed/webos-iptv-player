@@ -6,6 +6,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // Live: a header over three panes (groups | rows | preview), with the Guide
 // inside Live behind a List | Guide switch (e2e/live-guide.spec.ts).
 
@@ -46,7 +49,7 @@ async function setup(page: Page): Promise<void> {
     localStorage.setItem('iptv_playlists', JSON.stringify([
       { id: 'p1', name: 'P1', url: 'http://host/playlist.m3u' },
     ]));
-    localStorage.setItem('iptv_epg_url', JSON.stringify('http://host/guide.xml'));
+    localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: 'http://host/guide.xml', playlistIds: [] }]));
     localStorage.setItem('iptv_tz_mode', JSON.stringify('device'));
     // Native Chromium cannot decode the synthetic stream; the preview's
     // retune is what these tests watch, through the DOM.

@@ -1,5 +1,8 @@
 import { test, expect, routePlaylist, seedPlaylist, enterTab } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 test('switching through every language refreshes cached Recently Watched labels', async ({ page }) => {
   await routePlaylist(page);
   await seedPlaylist(page);

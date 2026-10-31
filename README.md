@@ -59,12 +59,12 @@ by lennylxx, licensed under Apache-2.0. See [NOTICE](NOTICE).
 **Playlists & accounts**
 
 - **M3U playlists** — load multiple M3U/M3U8 lists, auto-deduplicated, and temporarily disable a source without deleting its setup
-- **Xtream Codes accounts** — add or temporarily disable accounts, or switch between accounts from the top-bar avatar; playlists and EPG data are derived from their credentials
+- **Xtream Codes accounts** — add or temporarily disable accounts, or switch between accounts from the avatar on Home; playlists and EPG data are derived from their credentials
 - **LAN setup** — configure sources and online subtitle settings or upload `.m3u` files from a phone on the same network by scanning a QR code ([LAN service](docs/lan-service.md))
 
 **Live TV & on-demand**
 
-- **Program guide (EPG)** — three-pane guide with an auto-derived date range, per-source time correction, and caching for instant reopen
+- **Program guide (EPG)** — a time grid inside Live, beside its groups (switch with the Red key), with an auto-derived date range, per-source time correction, and caching for instant reopen
 - **Channel health** — check live streams and mark them as healthy, suspect, or unavailable
 - **Reminders** — flag an upcoming program and get notified at air time, even with the app closed, to tune straight in
 - **Recently Watched** — return to recent live channels or resume partially watched catch-up programs
@@ -89,13 +89,14 @@ by lennylxx, licensed under Apache-2.0. See [NOTICE](NOTICE).
 
 **Navigation**
 
+- **Home** — the first screen: large cards for Live, Movies, Series, Search, and Settings, the clock, and the account avatar; each section opens full screen and loads its own data
 - **Search** — across channels, EPG programs, movies, and series, with direct live, catch-up, and reminder actions; recent searches drop down under the search box for one-press repeat searches; the search index is prebuilt in the background and cached, so Search is ready almost instantly
-- **Channel sidebar** — switch channels over the video with current-program info, organized by group
+- **Channel sidebar** — press Left in the full-screen player to switch channels over the video, with current-program info, organized by group
 - **Channel customization** — reorder, hide, rename, regroup, manage favorites, and correct per-channel EPG matching or timing
-- **Auto-play and genre group icons** for faster browsing
+- **Genre group icons** for faster browsing
 - **Number-key channel entry** — press the remote's number keys to tune by channel number from the channel list or while watching, with on-screen digit feedback
 - **Full remote & Magic Remote** — spatial D-pad navigation and pointer control across every view
-- **Magic Remote edge scrolling** — rest the pointer near the edge of a catalog or search rail, tab row, or Guide date strip to scroll it, faster the longer it stays
+- **Magic Remote edge scrolling** — rest the pointer near the edge of a catalog or search rail or a long list to scroll it, faster the longer it stays
 - **Color themes** — choose from light and dark app-wide themes with live previews, plus Dark or Frosted player overlays; selections persist across launches
 - **Adjustable text size** — scale text from 80%–150% without resizing controls
 - **Interface size** — scale the whole interface, text, images, and controls together, from 90%–130%
@@ -255,7 +256,7 @@ ffmpeg) for testing in the preview or on a TV on your LAN. See
 
 ## Settings
 
-Open with the **Blue** key or the **Settings** tab in the top bar. Sections:
+Open with the **Blue** key or the **Settings** card on Home. Sections:
 
 - **Language** — follow the TV's system language when supported, or choose a language explicitly.
 - **Device Setup** — scan the QR code to configure the app from a phone, or open the shown URL on a computer and enter the pairing code.
@@ -269,9 +270,8 @@ Open with the **Blue** key or the **Settings** tab in the top bar. Sections:
 - **EPG time correction** — adjust each source independently in 15-minute steps.
 - **Program reminders** — open the date-grouped Reminder Manager to review or remove upcoming reminders.
 - **Appearance** — preview an app-wide color theme, choose Dark or Frosted player overlays, set the interface size from 90% to 130%, and adjust text from 80% to 150%.
-- **Playback** — toggle auto-play and Live preview, and choose whether Channel
-  Up/Down cycles the global list or stays within the active group, Favorites,
-  or playlist.
+- **Playback** — choose whether Channel Up/Down cycles the global list or
+  stays within the active group, Favorites, or playlist.
 - **Online Subtitles** — choose a preferred subtitle language and configure SubDL, OpenSubtitles, and Assrt credentials for online search. Optionally add your own TMDB API key (v3 key or v4 read access token) to show cast photos on movie and series pages; without one, the app never contacts TMDB.
 - **Advanced** — customize advanced interface, playback, and background refresh behavior.
 - **Data Management** — refresh data, clear caches or viewing lists, or reset the app.
@@ -279,24 +279,26 @@ Open with the **Blue** key or the **Settings** tab in the top bar. Sections:
 
 ## Remote Control Mapping
 
-| Key | Player | Channel List | EPG |
-|-----|--------|-------------|-----|
-| Up/Down | Channel +/- (live); show the controls (movies, episodes); move between rows in the controls | Navigate | Navigate within pane |
-| Left | Skip −10s (movies, episodes; catch-up and live DVR with the controls up); otherwise open sidebar, then groups | Move toward groups | Previous pane or day |
-| Right | Skip +10s (movies, episodes; catch-up and live DVR with the controls up); hold either to skip faster | Move toward channels | Next pane, day, or Reminder Manager |
-| OK/Enter | Pause/resume and show the controls (movies, episodes); open the controls (live); press the focused control | Select channel | Play channel/program or open Reminder Manager |
-| Back | Close the sidebar, a picker, or the controls; stop & return | Exit app (press twice) | Close guide |
-| Red | Open EPG | Open EPG | — |
-| Blue | Open settings | Open settings | Open settings |
-| Yellow | Show OSD | Edit channel list | Search guide |
-| Green | Toggle favorite (with the sidebar or live controls up) | Toggle favorite (on focused channel) | Jump to today |
-| Play/Pause | Pause/resume playback | — | — |
-| Rewind/Fast-Forward | To oldest / Go to live (live DVR) | — | — |
-| Ch +/- | Channel +/- | Previous/next channel | Jump 10 channels/programs |
-| 0-9 | Direct channel entry | Direct channel entry | — |
+| Key | Home | Live | Guide (in Live) | Player |
+|-----|------|------|-----------------|--------|
+| Up/Down | Move between cards | Move through groups or channels; Up from the top reaches the header | Previous/next channel; Up from the first row reaches the header | Channel +/- (live); show the controls (movies, episodes); move between rows in the controls |
+| Left/Right | Move between cards | Move between groups and channels | Earlier/later programs; Left at the earliest goes to the groups | Skip ∓10s (movies, episodes; catch-up and live DVR with the controls up), hold to skip faster; otherwise Left opens the channel sidebar |
+| OK/Enter | Open the focused section | Play the focused channel full screen | Watch, set a reminder, or play catch-up | Pause/resume and show the controls (movies, episodes); open the controls (live); press the focused control |
+| Back | Close the app | Go Home (leaves channel editing first) | Go to the groups, then Home | Close the sidebar, a picker, or the controls; then return to where playback started |
+| Red | Open the Guide | Switch to the Guide | Switch to the channel list | Open the Guide |
+| Green | — | Toggle favorite on the focused channel | — | Toggle favorite (with the sidebar or live controls up) |
+| Yellow | — | Edit the channel list | — | Show channel info |
+| Blue | Open Settings | Open Settings | Open Settings | Open Settings |
+| Stop | — | Stop the preview until focus moves | — | — |
+| Play/Pause | — | — | — | Pause/resume playback |
+| Rewind/Fast-Forward | — | — | — | To oldest / Go to live (live DVR) |
+| Ch +/- | — | Previous/next channel | Page through channels | Channel +/- |
+| 0-9 | Tune by channel number | Tune by channel number | — | Tune by channel number |
 
 Movies, Series, Search, Settings, and Reminder Manager use standard D-pad
-navigation; **Back** returns to the previous view.
+navigation. **Back** always goes up one level: from a detail page to its
+browse page, from a Settings sub-page to Settings, from a section to Home, and
+from Home it closes the app.
 
 ## Docs
 

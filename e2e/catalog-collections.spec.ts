@@ -3,6 +3,9 @@ import { seedXtream } from './fixtures/xtream';
 import { THEMES } from '../src/config/themes';
 import type { ResumeEntry, WatchlistEntry } from '../src/types';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 async function seedCollections(page: Page, count = 30): Promise<void> {
   await seedXtream(page);
   await page.route('http://host/poster/**', route => route.fulfill({

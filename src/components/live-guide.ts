@@ -10,6 +10,7 @@ import { EpgService } from '../services/epg-service';
 import { ReminderService } from '../services/reminder-service';
 import { StorageService } from '../services/storage-service';
 import { XtreamArchiveService } from '../services/xtream-archive';
+import { ChannelCustomizationService } from '../services/channel-customization';
 import { CatchupResumePrompt } from './catchup-resume-prompt';
 import { activateProgram } from './guide-actions';
 import { bellIcon, NAV_HORIZONTAL_ICON, NOW_PLAYING_ICON, REPLAY_ICON } from './icons';
@@ -227,7 +228,8 @@ export class LiveGuide {
         .map(entry => [entry.progStart, entry]))
       : null;
     return html`
-      <div class="guide-row" data-key="row:${index}" style="top:${top}px">
+      <div class="guide-row ${ChannelCustomizationService.isChannelHidden(channel) ? 'hidden-entry' : ''}"
+           data-key="row:${index}" style="top:${top}px">
         <div class="guide-channel ${index === this.options.watching() ? 'watching' : ''}">
           <span class="guide-number">${index + 1}</span>
           <span class="channel-logo-wrap">${channel.logo

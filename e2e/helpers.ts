@@ -170,6 +170,8 @@ export async function enterTab(
   section: 'home' | 'live' | 'movies' | 'series' | 'settings' | 'search',
 ): Promise<void> {
   const home = page.locator('#view-home');
+  // Launch lands on Home once the splash goes.
+  await expect(page.locator('#view-loading')).toBeHidden();
   if (!await home.isVisible()) await clickHomeButton(page);
   if (section === 'home') return;
   const card = home.locator(`[data-key="section:${section}"]`).first();
@@ -247,19 +249,27 @@ export async function measureRowTextFit(
 // Computed once per worker: walking the compat data per test is wasteful.
 const POST_TARGET_APIS = postTargetApis();
 
+export interface AppOptions {
+  /** Where `page.goto` and `page.reload` leave the app. `home` is where it
+   *  launches; `live` then opens Live from Home's Live card, as a viewer
+   *  does, and waits for its channels (`openLive`). A first run has no Live
+   *  card, so `live` opens Settings there with the Blue key instead. */
+  startOn: 'home' | 'live';
+}
+
 // Every spec imports `test` from here; it auto-stubs the service probe
 // before each test so no file has to repeat it.
-export const test = base.extend({
-  page: async ({ page }, use, testInfo) => {
+export const test = base.extend<AppOptions>({
+  startOn: ['home', { option: true }],
+  page: async ({ page, startOn }, use, testInfo) => {
     // The simulation project strips every API Chromium 53 lacks before the app
     // loads, so unguarded use fails here instead of on a TV.
     if (testInfo.project.name === 'chromium-53-simulation') {
       await page.addInitScript(removeApis, POST_TARGET_APIS);
     }
     await stubUploadService(page);
-    // Most flows start on Live; showHome() opts a test into Pleione's Home.
-    await page.addInitScript(() => localStorage.setItem('iptv_start_on_live', 'true'));
     await stubProviderApi(page);
+    if (startOn === 'live') startOnLive(page);
     const ringFailures = await auditRings(page, process.env.RING_AUDIT,
       `${testInfo.project.name} › ${testInfo.titlePath.slice(1).join(' › ')}`);
     await use(page);
@@ -383,9 +393,65 @@ function installRingAudit(recordNone: boolean): void {
 // merely *introspect* through a newer API (rather than exercise app behavior)
 // cannot run there; the behavior they observe is covered by the `chromium`
 // project.
-/** Pleione's default: launch on Home. Call before `page.goto`. */
-export async function showHome(page: Page): Promise<void> {
-  await page.addInitScript(() => localStorage.removeItem('iptv_start_on_live'));
+/** Open Live from Home through its card, as a viewer does, and wait for the
+ *  load to settle: the rows, or Live's error. */
+export async function openLive(page: Page): Promise<void> {
+  const card = page.locator('#view-home [data-key="section:live"]');
+  await expect(page.locator('#view-home .focused')).toHaveCount(1);
+  // A failed sign-in banner takes the focus first; Down reaches the cards.
+  if (await page.locator('#view-home [data-key^="alert:"].focused').count()) {
+    await page.keyboard.press('ArrowDown');
+  }
+  await expect(card).toHaveClass(/\bfocused\b/);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#view-channels')).toBeVisible();
+  await page.waitForFunction(() => {
+    const live = document.getElementById('view-channels')!;
+    return !live.classList.contains('live-loading') || !!live.querySelector('.live-load-error');
+  });
+}
+
+/** A Settings save returns Home: back to Live through its card, once the
+ *  channels have loaded or failed. */
+export async function liveAfterSave(page: Page): Promise<void> {
+  await expect(page.locator('#view-home')).toBeVisible();
+  await enterTab(page, 'live');
+  await expect(page.locator('#view-channels')).toBeVisible();
+  await page.waitForFunction(() => {
+    const live = document.getElementById('view-channels')!;
+    return !live.classList.contains('live-loading') || !!live.querySelector('.live-load-error');
+  });
+}
+
+/** The first run on Home: Blue opens Settings, where sources are set up. */
+export async function openFirstRunSettings(page: Page): Promise<void> {
+  await expect(page.locator('#view-home .home-view-first-run')).toBeVisible();
+  await pressKeys(page, 406);
+  await expect(page.locator('#view-settings')).toBeVisible();
+}
+
+// `startOn: 'live'`: once a load has launched the app, open Live from Home,
+// or Settings on a first run. A launch that opened another view (a reminder)
+// stays there.
+function startOnLive(page: Page): void {
+  const settle = async (): Promise<void> => {
+    await expect(page.locator('#view-loading')).toBeHidden({ timeout: 15_000 });
+    const home = page.locator('#view-home:not(.hidden)');
+    if (await home.locator('[data-key="section:live"]').count()) await openLive(page);
+    else if (await home.locator('.home-view-first-run').count()) await openFirstRunSettings(page);
+  };
+  const goto = page.goto.bind(page);
+  const reload = page.reload.bind(page);
+  page.goto = async (...args) => {
+    const response = await goto(...args);
+    await settle();
+    return response;
+  };
+  page.reload = async (...args) => {
+    const response = await reload(...args);
+    await settle();
+    return response;
+  };
 }
 
 /** Back from full-screen live playback, then out of Live. Back keeps the

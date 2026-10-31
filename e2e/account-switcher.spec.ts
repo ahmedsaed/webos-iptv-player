@@ -1,4 +1,4 @@
-import { test, expect, routeLiveManifest, SAMPLE_M3U, enterTab, showHome, type Page } from './helpers';
+import { test, expect, routeLiveManifest, SAMPLE_M3U, enterTab, type Page } from './helpers';
 
 // Two Xtream accounts on distinct hosts so player_api.php can serve a different
 // catalog per account: Alpha (a1) -> "Alpha Movie" under "Cat Alpha"; Bravo (a2)
@@ -65,7 +65,6 @@ const homeAvatar = (page: Page) => page.locator('.home-account .account-avatar')
 const homeSlot = (page: Page) => page.locator('.home-account');
 
 async function goHome(page: Page): Promise<void> {
-  await showHome(page);
   await page.goto('/');
   await expect(page.locator('.home-card.focused')).toHaveAttribute('data-section', 'live');
 }

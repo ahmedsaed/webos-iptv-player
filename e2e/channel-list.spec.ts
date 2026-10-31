@@ -10,6 +10,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // The channel list: rendering safety (XSS), group filtering, and the fact that
 // search and settings live on Home (not the sidebar).
 
@@ -422,6 +425,8 @@ test('a stationary pointer over the channel list does not trap D-pad Down', asyn
   await expect(start).toBeVisible();
   const box = await start.boundingBox();
   if (!box) throw new Error('no layout');
+  // Live was opened with the keys: a first move only seeds the pointer.
+  await page.mouse.move(1, 1);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await expect(start).toHaveClass(/\bfocused\b/);
 
@@ -941,6 +946,8 @@ test('a wheel step below a short list moves the pointer-left row at once', async
   const box = await row.boundingBox();
   const list = await main.boundingBox();
   if (!box || !list) throw new Error('no layout');
+  // Live was opened with the keys: a first move only seeds the pointer.
+  await page.mouse.move(1, 1);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await expect(row).toHaveClass(/\bfocused\b/);
   // Onto the empty list area under the rows, which has nothing to scroll.

@@ -10,6 +10,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // channelKey mirrors src/utils/channel.ts (fnv1a of the URL sans query/fragment).
 function channelKey(url: string): string {
   const stable = url.split('#')[0].split('?')[0];

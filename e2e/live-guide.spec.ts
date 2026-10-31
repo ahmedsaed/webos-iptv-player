@@ -8,6 +8,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // The Guide inside Live: the groups column, the header, and a time grid of
 // two and a half hours; Left and Right move through time, Up and Down
 // through channels, and OK watches, reminds, or plays catch-up.
@@ -52,7 +55,7 @@ async function setup(page: Page): Promise<void> {
     localStorage.setItem('iptv_playlists', JSON.stringify([
       { id: 'p1', name: 'P1', url: 'http://host/playlist.m3u' },
     ]));
-    localStorage.setItem('iptv_epg_url', JSON.stringify('http://host/guide.xml'));
+    localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: 'http://host/guide.xml', playlistIds: [] }]));
     localStorage.setItem('iptv_tz_mode', JSON.stringify('device'));
     const proto = HTMLMediaElement.prototype;
     proto.load = function () { /* no-op */ };

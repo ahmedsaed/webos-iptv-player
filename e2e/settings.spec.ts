@@ -1,11 +1,22 @@
 import {
+  liveAfterSave,
   test, expect, type Page, routePlaylist, routeLiveManifest, seedPlaylist, PLAYLIST_URL, enterTab, readUserDataStore,
   isChromium53, pressKeys,
 } from './helpers';
 import type { Locator } from '@playwright/test';
 import { seedXtream } from './fixtures/xtream';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // All Settings coverage: navigation, playlist save/removal, Xtream, and uploads.
+
+// A first run opens Settings with the Blue key, which leaves the keys in
+// charge; the pointer's first move only seeds its position, the next takes over.
+async function pointerTakesOver(page: Page): Promise<void> {
+  await page.mouse.move(900, 2);
+  await page.mouse.move(960, 2);
+}
 
 test.describe('Settings navigation', () => {
   test('the Settings tab on the channel list opens settings', async ({ page }) => {
@@ -421,7 +432,7 @@ test.describe('Settings navigation', () => {
     expect(scrolled!.y).toBeCloseTo(actionBox!.y, 0);
   });
 
-  test('clicking Cancel in settings (opened from Home) returns to the channel list, not the player', async ({ page }) => {
+  test('clicking Cancel in settings (opened from Home) returns Home, and nothing plays', async ({ page }) => {
     await routePlaylist(page);
     await seedPlaylist(page);
     await page.goto('/');
@@ -433,11 +444,11 @@ test.describe('Settings navigation', () => {
     await page.locator('#cancel-settings').click();
 
     // Give the document-level deferred select (setTimeout 0) a chance to fire,
-    // then assert we still land on the channel list rather than the player.
-    // Before the fix, that second select fired on the channels view and played
-    // the focused channel.
+    // then assert we still land on Home. Before the fix, that second select
+    // fired on the view Cancel landed on and activated its focused item.
     await page.waitForTimeout(50);
-    await expect(page.locator('#view-channels')).toBeVisible();
+    await expect(page.locator('#view-home')).toBeVisible();
+    await expect(page.locator('#view-channels')).toBeHidden();
     await expect(page.locator('#view-player')).toBeHidden();
     await expect(page.locator('#view-settings')).toBeHidden();
   });
@@ -445,6 +456,7 @@ test.describe('Settings navigation', () => {
   test('Magic Remote hover on a category never switches the page', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#view-settings')).toBeVisible();
+    await pointerTakesOver(page);
 
     const general = page.locator('[data-settings-target="general"]');
     const appearance = page.locator('[data-settings-target="appearance"]');
@@ -482,7 +494,7 @@ test.describe('Settings navigation', () => {
     await expect(focusedButton).toHaveCSS('transform', 'matrix(1.03, 0, 0, 1.03, 0, 0)');
 
     await page.locator('[data-settings-target="playback"]').click();
-    const toggle = page.locator('#auto-play .toggle-option').first();
+    const toggle = page.locator('#channel-cycle-mode .toggle-option').first();
     await toggle.hover();
     await expect(toggle).toHaveClass(/focused/);
     await expect(toggle).toHaveCSS('transform', 'none');
@@ -695,7 +707,7 @@ test.describe('Settings navigation', () => {
     expect(await fontSize()).toBeCloseTo(base * 1.3, 1);
 
     await page.locator('#save-settings').click();
-    await expect(page.locator('#view-channels')).toBeVisible();
+    await liveAfterSave(page);
 
     // Persisted across a relaunch and applied outside Settings, without
     // changing the dimensions of controls.
@@ -1011,7 +1023,7 @@ test.describe('Settings playlists', () => {
     await routePlaylist(page);
     await page.goto('/');
 
-    // First run with no playlist opens settings.
+    // On a first run, the Blue key opens Settings (see `startOn`).
     await expect(page.locator('#view-settings')).toBeVisible();
 
     // Add a playlist row and fill in its URL.
@@ -1031,7 +1043,7 @@ test.describe('Settings playlists', () => {
     });
     await page.keyboard.press('Enter');
 
-    await expect(page.locator('#view-channels')).toBeVisible();
+    await liveAfterSave(page);
     await expect(page.locator('.channel-main .channel-name').filter({ hasText: 'Channel One' })).toBeVisible();
     await expect(page.locator('.channel-main .channel-name').filter({ hasText: 'Channel Two' })).toBeVisible();
   });
@@ -1061,18 +1073,9 @@ test.describe('Settings playlists', () => {
     });
     await page.keyboard.press('Enter');
 
-    // loadData re-opens settings because there are no playlists now. Wait for
-    // its completion toast before pressing Back; Settings was already visible
-    // before Save, so visibility alone cannot distinguish completion.
-    await expect(page.locator('.toast.visible'))
-      .toContainText('Welcome! Add a playlist URL to get started.');
-
-    // Back goes Home, now the first run; Live (the Red key flips the Guide
-    // to the list) must NOT show the previous playlist's channels (the bug:
-    // PlaylistService kept stale in-memory state).
-    await page.evaluate(() => {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
-    });
+    // The save returns Home, now the first run; Live (the Red key flips the
+    // Guide to the list) must NOT show the previous playlist's channels (the
+    // bug: PlaylistService kept stale in-memory state).
     await expect(page.locator('#view-home [data-key="add:xtream"]')).toBeVisible();
     await pressKeys(page, 403);
     await expect(page.locator('#view-channels.live-guide-mode')).toBeVisible();
@@ -1184,7 +1187,7 @@ test.describe('Settings Xtream: add -> cancel -> re-enter', () => {
 
     // 3) Cancel.
     await page.click('#cancel-settings');
-    await expect(page.locator('#view-channels')).toBeVisible(); // back on channels
+    await expect(page.locator('#view-home')).toBeVisible(); // back Home
 
     // 4) Re-enter Settings.
     await openSettings(page);
@@ -1291,9 +1294,9 @@ test.describe('Settings Xtream live output', () => {
       return url.pathname.endsWith('/get.php') && url.searchParams.get('output') === 'm3u8';
     });
     await page.locator('#save-settings').click();
+    // The save returns Home, which loads no channels; Live loads them anew.
+    await liveAfterSave(page);
     await hlsRequest;
-
-    await expect(page.locator('#view-channels')).toBeVisible();
     await expect(page.locator('.channel-main .channel-item')).toContainText('HLS Channel');
     await expect.poll(() => page.evaluate(() => {
       const playlists = JSON.parse(localStorage.getItem('iptv_playlists') || '[]');
@@ -1371,7 +1374,7 @@ test.describe('Settings Xtream live categories', () => {
     await expect(button).toContainText('2 of 3');
 
     await page.locator('#save-settings').click();
-    await expect(page.locator('#view-channels')).toBeVisible();
+    await liveAfterSave(page);
     await expect(channels(page)).toHaveCount(2);
     await expect(channels(page)).not.toContainText(['Bravo']);
     expect(await page.evaluate(() =>
@@ -1721,10 +1724,10 @@ test.describe('Settings phone setup card', () => {
 
     await page.goto('/');
     await page.locator('[data-settings-target="general"]').click();
-    await expect(page.locator('.setup-qr')).toBeVisible();
+    await expect(page.locator('#view-settings .setup-qr')).toBeVisible();
 
     const layout = await page.evaluate(() => {
-      const qr = document.querySelector('.setup-qr')!.getBoundingClientRect();
+      const qr = document.querySelector('#view-settings .setup-qr')!.getBoundingClientRect();
       const text = document.querySelector('.setup-instructions')!.getBoundingClientRect();
       return {
         gap: Math.round(text.left - qr.right),
@@ -1795,6 +1798,7 @@ test.describe('Settings pages', () => {
   test('Magic Remote hover lights a category without switching; its click does', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#view-settings')).toBeVisible();
+    await pointerTakesOver(page);
     const guide = page.locator('[data-settings-target="guide"]');
     await guide.hover();
     await expect(guide).toHaveClass(/focused/);
@@ -1811,19 +1815,19 @@ test.describe('Settings pages', () => {
     await enterTab(page, 'settings');
 
     await page.locator('[data-settings-target="playback"]').click();
-    await page.locator('#auto-play [data-value="on"]').click();
+    await page.locator('#channel-cycle-mode [data-value="active"]').click();
     await page.locator('[data-settings-target="appearance"]').click();
     await page.locator('.theme-swatch[data-theme-id="arctic"]').click();
     await page.locator('[data-settings-target="general"]').click();
     await page.locator('[data-settings-target="playback"]').click();
-    await expect(page.locator('#auto-play .toggle-option.active')).toHaveAttribute('data-value', 'on');
+    await expect(page.locator('#channel-cycle-mode .toggle-option.active')).toHaveAttribute('data-value', 'active');
     await page.locator('[data-settings-target="appearance"]').click();
     await expect(page.locator('.theme-swatch.active')).toHaveAttribute('data-theme-id', 'arctic');
 
     await page.locator('#save-settings').click();
     await expect.poll(() => page.evaluate(() => [
-      localStorage.getItem('iptv_auto_play'), localStorage.getItem('iptv_theme'),
-    ])).toEqual(['true', '"arctic"']);
+      localStorage.getItem('iptv_channel_cycle_mode'), localStorage.getItem('iptv_theme'),
+    ])).toEqual(['"active"', '"arctic"']);
   });
 
   for (const size of ['100', '130']) {

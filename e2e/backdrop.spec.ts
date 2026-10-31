@@ -1,4 +1,4 @@
-import { test, expect, enterTab, openGuide, routePlaylist, showHome, type Page } from './helpers';
+import { test, expect, enterTab, openGuide, routePlaylist, type Page } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
 // Every page without artwork or video sits on Pleione's shared backdrop:
@@ -11,15 +11,17 @@ async function expectBackdrop(page: Page, view: string, section: Section, clear:
   const viewEl = page.locator(view);
   await expect(viewEl).toBeVisible();
   await expect(viewEl).toHaveAttribute('data-backdrop', section);
-  const paint = await viewEl.evaluate((el, name) => {
+  // Strings, since the launch splash is checked before app.js brings the
+  // polyfills the simulation needs to return an object.
+  const paint = JSON.parse(await viewEl.evaluate((el, name) => {
     const root = getComputedStyle(document.documentElement);
     const token = (prop: string) => root.getPropertyValue(prop).trim();
-    return {
+    return JSON.stringify({
       image: getComputedStyle(el).backgroundImage,
       glow: token('--backdrop-glow'),
       tint: name === 'home' ? '' : token(`--backdrop-tint-${name}`),
-    };
-  }, section);
+    });
+  }, section)) as { image: string; glow: string; tint: string };
   expect(paint.glow).not.toBe('');
   expect(paint.image).toContain(paint.glow);
   // Search centers the glow behind its query box; every other page keeps it top left.
@@ -33,10 +35,10 @@ async function expectBackdrop(page: Page, view: string, section: Section, clear:
   for (const selector of clear) {
     const target = page.locator(`${view} ${selector}`).first();
     await expect(target).toBeVisible();
-    const fill = await target.evaluate((el) => {
+    const fill = JSON.parse(await target.evaluate((el) => {
       const cs = getComputedStyle(el);
-      return { color: cs.backgroundColor, image: cs.backgroundImage };
-    });
+      return JSON.stringify({ color: cs.backgroundColor, image: cs.backgroundImage });
+    })) as { color: string; image: string };
     expect(fill, `${selector} paints over the backdrop`).toEqual({ color: 'rgba(0, 0, 0, 0)', image: 'none' });
   }
 }
@@ -60,7 +62,6 @@ async function seedResume(page: Page): Promise<void> {
 
 test('Home, Search, Live, and the Guide sit on the shared backdrop', async ({ page }) => {
   await seedXtream(page);
-  await showHome(page);
   await page.goto('/');
   await expectBackdrop(page, '#view-home', 'home', ['.home-view']);
 
@@ -79,17 +80,18 @@ test('the launch splash sits on Home\'s backdrop, and later loads drop it', asyn
   let release: () => void = () => {};
   const held = new Promise<void>((resolve) => { release = resolve; });
   await routePlaylist(page);
-  await page.route('**/playlist.m3u', async (route) => {
+  // The splash shows until the app boots onto Home.
+  await page.route('**/js/app.js', async (route) => {
     await held;
     await route.fallback();
   });
   await page.addInitScript(() => {
     localStorage.setItem('iptv_playlists', JSON.stringify([{ name: 'Test', url: 'http://host/playlist.m3u' }]));
   });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'commit' });
   await expectBackdrop(page, '#view-loading', 'home', ['.loading-container']);
   release();
-  await expect(page.locator('#channel-browser .channel-item').first()).toBeVisible();
+  await expect(page.locator('#view-home')).toBeVisible();
   await expect(page.locator('#view-loading')).not.toHaveAttribute('data-backdrop', /./);
 });
 

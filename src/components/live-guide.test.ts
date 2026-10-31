@@ -44,6 +44,10 @@ vi.mock('../services/xtream-archive', () => ({
     load: vi.fn(async () => null),
   },
 }));
+const hiddenUrls = new Set<string>();
+vi.mock('../services/channel-customization', () => ({
+  ChannelCustomizationService: { isChannelHidden: (ch: Channel) => hiddenUrls.has(ch.url) },
+}));
 vi.mock('./toast', () => ({ showToast: toast }));
 vi.mock('../services/storage-service', () => ({
   StorageService: { getCatchupProgressList: () => [], clearCatchupProgress: vi.fn() },
@@ -138,6 +142,18 @@ describe('LiveGuide', () => {
     expect(cell('<img src=x')).not.toBeNull();
     expect(container.textContent).toContain('<b>ch2</b>');
     data.channels[1].name = 'ch2';
+  });
+
+  it('dims a hidden channel shown by Show hidden channels, as the list does', () => {
+    hiddenUrls.add(data.channels[1].url);
+    try {
+      guide.render();
+      const rows = container.querySelectorAll('.guide-row');
+      expect(rows[0].classList.contains('hidden-entry')).toBe(false);
+      expect(rows[1].classList.contains('hidden-entry')).toBe(true);
+    } finally {
+      hiddenUrls.clear();
+    }
   });
 
   it('renders a bounded window of rows for a large playlist', () => {

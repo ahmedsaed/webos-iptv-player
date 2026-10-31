@@ -1,4 +1,5 @@
 import {
+  liveAfterSave,
   test,
   expect,
   routePlaylist,
@@ -8,6 +9,9 @@ import {
   enterTab,
   type Page,
 } from './helpers';
+
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
 
 // Channel customization: the in-place edit mode on the Live channel list —
 // reorder, hide, rename, regroup, EPG mapping — plus its Settings entry point,
@@ -589,7 +593,7 @@ test('Settings enters edit mode, reveals hidden channels, and resets everything'
   // Show hidden reveals the hidden channel in the normal list, marked.
   await page.locator('#show-hidden [data-value="on"]').click();
   await page.locator('#save-settings').click();
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await liveAfterSave(page);
   await expect(page.locator('.channel-main .channel-item')).toHaveCount(4);
   await expect(page.locator('.channel-main .hidden-entry')).toHaveCount(1);
 
@@ -600,9 +604,35 @@ test('Settings enters edit mode, reveals hidden channels, and resets everything'
   await expect(page.locator('.confirmation-prompt')).toBeVisible();
   await page.locator('.confirmation-btn').first().click();
   await page.locator('#save-settings').click();
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await liveAfterSave(page);
   await expect(page.locator('.channel-main .hidden-entry')).toHaveCount(0);
   await expect(page.locator('.channel-main .channel-item')).toHaveCount(4);
+});
+
+test('Show hidden channels dims a hidden channel in the Guide as in the list', async ({ page }) => {
+  await boot(page);
+  await key(page, YELLOW);
+  await focusChannel(page, 1);
+  await key(page, ENTER);
+  await key(page, GREEN);
+  await key(page, YELLOW);
+
+  await enterTab(page, 'settings');
+  await page.locator('[data-settings-target="sources"]').click();
+  await page.locator('#show-hidden [data-value="on"]').click();
+  await page.locator('#save-settings').click();
+  await liveAfterSave(page);
+  const listRow = page.locator('.channel-main .channel-item.hidden-entry');
+  await expect(listRow).toHaveCount(1);
+  const hiddenName = await listRow.locator('.channel-name').innerText();
+
+  await key(page, RED);
+  const rows = page.locator('#live-guide .guide-row');
+  await expect(rows).toHaveCount(4);
+  const dimmed = page.locator('#live-guide .guide-row.hidden-entry');
+  await expect(dimmed).toHaveCount(1);
+  await expect(dimmed.locator('.guide-name')).toHaveText(hiddenName);
+  await expect(dimmed).toHaveCSS('opacity', '0.45');
 });
 
 test('the Settings edit-channel-list button jumps to the Live list in edit mode', async ({ page }) => {

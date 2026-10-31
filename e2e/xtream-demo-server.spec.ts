@@ -1,5 +1,8 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { test, expect, enterTab, type Page, openGuide } from './helpers';
+import { test, expect, enterTab, liveAfterSave, type Page, openGuide } from './helpers';
+
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
 
 // Drives the real app against the demo Xtream server (scripts/xtream-demo-server.mjs)
 // with real, locally generated media. Needs ffmpeg; the first run encodes the
@@ -73,7 +76,8 @@ async function openPicker(page: Page, control: 'audio' | 'subtitles'): Promise<v
 
 test('adds the demo server in Settings and loads live channels with a guide', async ({ page }) => {
   await page.goto('/');
-  // First run opens Settings on General; accounts live on the Sources page.
+  // A first run opens Settings on General (see `startOn`); accounts live on
+  // the Sources page.
   await page.locator('[data-settings-target="sources"]').click({ timeout: 20_000 });
   await page.waitForSelector('#add-xtream', { timeout: 20_000 });
   await page.click('#add-xtream');
@@ -83,7 +87,7 @@ test('adds the demo server in Settings and loads live channels with a guide', as
   await card.locator('.xtream-password').fill('p1');
   await page.click('#save-settings');
 
-  await expect(page.locator('#view-channels')).toBeVisible({ timeout: 30_000 });
+  await liveAfterSave(page);
   const first = page.locator('.channel-main .channel-item').first();
   await expect(first).toContainText('Alpha');
   await expect(first.locator('.channel-now')).toContainText(/Program \d+/);

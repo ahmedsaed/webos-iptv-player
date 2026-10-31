@@ -1,8 +1,7 @@
 import { CONFIG } from '../config';
 import { DEFAULT_THEME, DEFAULT_OVERLAY, DEFAULT_TEXT_SIZE, DEFAULT_INTERFACE_SIZE, isValidTextSize, isValidInterfaceSize, type OverlayStyle, type TextSize, type InterfaceSize } from '../config/themes';
-import type { AudioPref, CatchupProgressEntry, Channel, ChannelCustomization, ChannelCycleMode, ManualEpgSource, ParentalControlConfig, ParentalPinThrottle, PlaylistEntry, RecentlyWatchedLiveEntry, Reminder, ResumeEntry, ResumeKind, SubtitlePref, TzMode, WatchlistEntry, WatchlistKind, XtreamLiveCategorySnapshot } from '../types';
+import type { AudioPref, CatchupProgressEntry, ChannelCustomization, ChannelCycleMode, ManualEpgSource, ParentalControlConfig, ParentalPinThrottle, PlaylistEntry, RecentlyWatchedLiveEntry, Reminder, ResumeEntry, ResumeKind, SubtitlePref, TzMode, WatchlistEntry, WatchlistKind, XtreamLiveCategorySnapshot } from '../types';
 import type { OnlineSubtitleConfig, PickedOnlineSub } from './subtitle-search/types';
-import { channelKey, legacyChannelKey } from '../utils/channel';
 import { genPlaylistId } from '../utils/playlist';
 import { isCatalogSort, isCatalogSortDirection, type CatalogSortPreference } from '../utils/catalog-sort';
 import { normalizeXtreamBaseUrl } from '../utils/xtream-url';
@@ -878,20 +877,10 @@ export const StorageService = {
 
   getManualEpgSources(): ManualEpgSource[] {
     const stored = get<unknown>('manual_epg_sources', null);
-    if (Array.isArray(stored)) return sanitizeManualEpgSources(stored);
-    // TODO(post-1.16.0): Remove this migration and all `epg_url` access.
-    const legacy = get<string>('epg_url', '').trim();
-    if (!legacy) return [];
-    const migrated = [{ url: legacy, playlistIds: [] }];
-    if (set('manual_epg_sources', migrated)) remove('epg_url');
-    return migrated;
+    return Array.isArray(stored) ? sanitizeManualEpgSources(stored) : [];
   },
   setManualEpgSources(sources: ManualEpgSource[]): boolean {
-    const sanitized = sanitizeManualEpgSources(sources);
-    if (!set('manual_epg_sources', sanitized)) return false;
-    // TODO(post-1.16.0): Remove with the legacy `epg_url` migration.
-    remove('epg_url');
-    return true;
+    return set('manual_epg_sources', sanitizeManualEpgSources(sources));
   },
 
   getEpgOffsets(): Record<string, number> {
@@ -937,22 +926,6 @@ export const StorageService = {
     syncUserRecords('reminders', previous, next);
   },
 
-  getLastChannel(): number {
-    return get<number>('last_channel', 0);
-  },
-  setLastChannel(index: number): void {
-    set('last_channel', index);
-  },
-
-  // Companion to last_channel: the channelKey survives a reorder or a provider
-  // reshuffle, where the index does not. The index stays as the fallback for an
-  // install that predates this key.
-  getLastChannelKey(): string {
-    return get<string>('last_channel_key', '');
-  },
-  setLastChannelKey(key: string): void {
-    set('last_channel_key', key);
-  },
   getChannelCustomization(): ChannelCustomization | null {
     const data = userData
       ? cloneValue(userData.channelCustomization)
@@ -1076,36 +1049,6 @@ export const StorageService = {
     return idx < 0; // true = added
   },
 
-  // Favorites have used both `id || name` and the query-stripped channelKey.
-  // Re-key every match so migration never silently discards a saved favorite.
-  // TODO(cleanup, post-1.9.0): after a couple of releases, remove this method,
-  // its PlaylistService call sites, and its tests; the flags can remain inert.
-  migrateFavoriteKeys(channels: Channel[]): void {
-    if (get<boolean>('fav_stream_keyed', false)) return;
-    if (!channels.length) return;
-    const urlKeyed = get<boolean>('fav_url_keyed', false);
-    const migrated: string[] = [];
-    for (const oldKey of new Set(this.getFavorites())) {
-      if (channels.some(ch => channelKey(ch) === oldKey)) {
-        migrated.push(oldKey);
-        continue;
-      }
-      const matches = channels.filter(ch =>
-        urlKeyed ? legacyChannelKey(ch) === oldKey : (ch.id || ch.name) === oldKey);
-      migrated.push(...matches.map(channelKey));
-    }
-    if (!this.setFavorites([...new Set(migrated)])) return;
-    if (!set('fav_url_keyed', true)) return;
-    set('fav_stream_keyed', true);
-  },
-
-  getAutoPlay(): boolean {
-    return get<boolean>('auto_play', false);
-  },
-  setAutoPlay(val: boolean): void {
-    set('auto_play', val);
-  },
-
   getAnimationMode(): AnimationMode {
     const mode = get<unknown>('animation_mode', DEFAULT_ANIMATION_MODE);
     return isAnimationMode(mode) ? mode : DEFAULT_ANIMATION_MODE;
@@ -1117,11 +1060,11 @@ export const StorageService = {
     set('animation_mode', mode);
   },
 
-  // 'global' = channel_up/channel_down cycles the entire channel list
-  // (default, matches pre-scoping behavior), 'active' = stays within the
-  // group/playlist/Favorites a channel was tuned from.
+  // 'active' (the default) = channel_up/channel_down stays within the
+  // group/playlist/Favorites a channel was tuned from; 'global' = cycles the
+  // entire channel list. A stored choice keeps its value.
   getChannelCycleMode(): ChannelCycleMode {
-    return get<ChannelCycleMode>('channel_cycle_mode', 'global');
+    return get<ChannelCycleMode>('channel_cycle_mode', 'active');
   },
   setChannelCycleMode(mode: ChannelCycleMode): void {
     set('channel_cycle_mode', mode);
@@ -1150,11 +1093,6 @@ export const StorageService = {
   },
   setTextSize(size: TextSize): void {
     set('text_size', size);
-  },
-
-  // Hidden (no UI): open Live instead of Home at launch.
-  getStartOnLive(): boolean {
-    return get<boolean>('start_on_live', false) === true;
   },
 
   getInterfaceSize(): InterfaceSize {

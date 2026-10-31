@@ -9,6 +9,9 @@ import {
 import type { Locator } from '@playwright/test';
 import type { ResumeEntry, WatchlistEntry } from '../src/types';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // Pointer edge-hover scrolling: a horizontal track marked data-edge-scroll
 // scrolls itself while the pointer rests near one of its ends, after a dwell,
 // and stops on anything that is not that pointer resting there.

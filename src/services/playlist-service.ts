@@ -309,7 +309,6 @@ class PlaylistServiceImpl {
       log.info('Cache hit:', this.allChannels.length, 'channels,', this.epgSources.length, 'epg sources');
       this.applyCustomization();
       this.buildPlaylistTabs();
-      StorageService.migrateFavoriteKeys(this.channels);
       this.logLoadCompleted('cache', enabledIds.size, 0);
       return this.channels;
     }
@@ -635,7 +634,6 @@ class PlaylistServiceImpl {
     }
     this.applyCustomization();
     this.buildPlaylistTabs();
-    StorageService.migrateFavoriteKeys(this.channels);
     log.info('Refresh complete:', allChannels.length, 'total channels,', epgSources.length, 'epg sources');
     this.logLoadCompleted('network', playlists.length, failedPlaylists);
     done();
@@ -1006,22 +1004,6 @@ class PlaylistServiceImpl {
       if (channelKey(this.channels[i]) === key) return i;
     }
     return -1;
-  }
-
-  private indexOfUniqueKey(key: string): number {
-    let match = -1;
-    for (let i = 0; i < this.channels.length; i++) {
-      const channel = this.channels[i];
-      if (channelKey(channel) !== key && legacyChannelKey(channel) !== key) continue;
-      if (match >= 0) return -1;
-      match = i;
-    }
-    return match;
-  }
-
-  resolveLastChannelIndex(stableKey: string, legacyIndex: number): number {
-    if (!stableKey) return legacyIndex;
-    return this.indexOfUniqueKey(stableKey);
   }
 }
 

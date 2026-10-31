@@ -1,6 +1,9 @@
 import { test, expect, enterTab, type Page } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // Counts each routed request to one player_api action; the first `failures`
 // get `status`, the rest fall through to the seeded portal.
 async function failAction(

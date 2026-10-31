@@ -4,6 +4,9 @@ import {
   type XtreamReferenceProfile,
 } from './fixtures/xtream-reference-server';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 test.use({ timezoneId: 'UTC' });
 
 const NOW = new Date('2024-03-09T12:00:00Z');

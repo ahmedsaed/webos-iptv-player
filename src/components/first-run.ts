@@ -9,14 +9,13 @@ import { PHONE_ICON } from './icons';
 export type FirstRunLanding = 'home' | 'settings';
 
 // No source at all: a launch onto Home shows the first-run screen there;
-// started on Live, or reloaded from Settings, it opens Settings.
+// a later channel load opens Settings.
 export function firstRunLanding(
   playlists: readonly PlaylistEntry[],
-  landing: 'launch' | 'channels' | 'section' | 'live' | 'quiet',
-  startOnLive: boolean,
+  landing: 'launch' | 'live' | 'quiet',
 ): FirstRunLanding | null {
   if (playlists.length) return null;
-  return landing === 'launch' && !startOnLive ? 'home' : 'settings';
+  return landing === 'launch' ? 'home' : 'settings';
 }
 
 // Home's intro and the phone-setup panel beside its two Add cards. `info`

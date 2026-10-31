@@ -1,5 +1,8 @@
 import { test, expect, enterTab, type Page } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 type Section = 'movies' | 'series';
 
 // Eight categories of 25 titles: rails end in See all, and All categories

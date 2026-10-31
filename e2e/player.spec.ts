@@ -1,4 +1,6 @@
 import {
+  pressKeys,
+  liveAfterSave,
   test,
   expect,
   type Page,
@@ -11,6 +13,9 @@ import {
   SEARCH_M3U,
   pressStepsAndReadPlayer,
 } from './helpers';
+
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
 
 // The player view: playback start, sidebar, controls, track pickers, OSD, and live DVR.
 
@@ -67,8 +72,8 @@ test('live playback retries the current channel before switching', async ({ page
   await attempts.locator('.dropdown-trigger').click();
   await attempts.locator('[data-dropdown-value="1"]').click();
   await page.locator('#save-settings').click();
-  await expect(page.locator('#view-channels')).toBeVisible();
-  await page.keyboard.press('Enter');
+  await liveAfterSave(page);
+  await page.locator('.channel-main .channel-item').first().click();
   await expect(page.locator('.osd-channel-name')).toHaveText('Channel One');
 
   const video = page.locator('#video-player');
@@ -77,12 +82,13 @@ test('live playback retries the current channel before switching', async ({ page
     el.dispatchEvent(new Event('error'));
   });
   await expect(page.locator('#view-player')).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('iptv_last_channel'))).toBe('0');
   await expect(video).not.toHaveAttribute('data-original-stream', 'true');
-  expect(await page.evaluate(() => localStorage.getItem('iptv_last_channel'))).toBe('0');
+  // Still on the same channel: Yellow shows its info.
+  await pressKeys(page, 405);
+  await expect(page.locator('.osd-channel-name')).toHaveText('Channel One');
   await video.dispatchEvent('error');
-  await expect.poll(() =>
-    page.evaluate(() => localStorage.getItem('iptv_last_channel'))).toBe('1');
+  await pressKeys(page, 405);
+  await expect(page.locator('.osd-channel-name')).toHaveText('Channel Two');
 });
 
 test('player sidebar focuses the playing channel; search still filters', async ({ page }) => {
@@ -343,11 +349,8 @@ test('player sidebar falls back to All after playback leaves the retained group'
   await expect(sidebar.locator('.sidebar-ch-item.focused')).toContainText('Alpha Movies');
 });
 
-test('channel_up/channel_down stay within the group a channel was tuned from, when Active is on', async ({ page }) => {
-  // Scoping is opt-in (settings.channelCycleMode), defaulting to Global.
-  await page.addInitScript(() => {
-    localStorage.setItem('iptv_channel_cycle_mode', JSON.stringify('active'));
-  });
+test('channel_up/channel_down stay within the group a channel was tuned from by default', async ({ page }) => {
+  // settings.channelCycleMode defaults to Active, the current group.
   await gotoGroupedPlayer(page);
   const sidebar = page.locator('#player-sidebar');
 
@@ -372,7 +375,11 @@ test('channel_up/channel_down stay within the group a channel was tuned from, wh
   await expect(page.locator('.osd-channel-name')).toHaveText('Alpha News');
 });
 
-test('channel_up/channel_down cycle the full list by default, even when tuned from a group', async ({ page }) => {
+test('channel_up/channel_down cycle the full list when Global is chosen, even when tuned from a group', async ({ page }) => {
+  // An explicit stored choice stays as it is.
+  await page.addInitScript(() => {
+    localStorage.setItem('iptv_channel_cycle_mode', JSON.stringify('global'));
+  });
   await gotoGroupedPlayer(page);
   const sidebar = page.locator('#player-sidebar');
 
@@ -383,12 +390,11 @@ test('channel_up/channel_down cycle the full list by default, even when tuned fr
   await page.keyboard.press('ArrowDown'); // News
   await page.keyboard.press('Enter');
   await expect(sidebar.locator('.sidebar-ch-item.focused')).toContainText('Beta News');
-  await page.keyboard.press('Enter'); // Tune Beta News (default: Global) and close.
+  await page.keyboard.press('Enter'); // Tune Beta News (Global) and close.
   await expect(page.locator('.osd-channel-name')).toHaveText('Beta News');
 
-  // settings.channelCycleMode defaults to Global — existing users see no
-  // change: channel_up steps to the next channel in the full list (Alpha
-  // Movies), spilling past News, same as before PR58.
+  // Global: channel_up steps to the next channel in the full list (Alpha
+  // Movies), spilling past News.
   await page.keyboard.press('ArrowUp');
   await expect(page.locator('.osd-channel-name')).toHaveText('Alpha Movies');
 });

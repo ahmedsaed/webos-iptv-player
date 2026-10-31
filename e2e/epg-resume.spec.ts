@@ -3,6 +3,9 @@ import {
   pressStepsAndReadPlayer,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // Catch-up resume markers + resume prompt. A fixed clock and a UTC device zone
 // keep wall-clock == absolute time so the past/live/future split is unambiguous.
 test.use({ timezoneId: 'UTC' });
@@ -39,7 +42,7 @@ async function setup(page: Page, seed?: Seed): Promise<void> {
   await page.clock.setFixedTime(NOW);
   await page.addInitScript(({ url, s }) => {
     localStorage.setItem('iptv_playlists', JSON.stringify([{ name: 'P', url: 'http://host/playlist.m3u' }]));
-    localStorage.setItem('iptv_epg_url', JSON.stringify('http://host/epg.xml'));
+    localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: 'http://host/epg.xml', playlistIds: [] }]));
     localStorage.setItem('iptv_tz_mode', JSON.stringify('device'));
     if (!s) return;
     // Mirror channelKey(): FNV-1a of the URL with query/fragment stripped.

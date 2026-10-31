@@ -528,6 +528,10 @@ export class Settings {
   private healthProgress: ChannelHealthProgress | null = null;
   private healthPaused = false;
   private healthResume: (() => void) | null = null;
+  // Settings opens before the channels load; the parts that need them wait.
+  private channelsLoading = false;
+  private saveWhenChannelsLoad = false;
+  private channelsReady: () => boolean = () => true;
 
   constructor(
     container: HTMLElement,
@@ -725,7 +729,6 @@ export class Settings {
     this.storedEpgOffsets = StorageService.getEpgOffsets();
     this.epgOffsets = { ...this.storedEpgOffsets };
     const epgSources = this.epgSources(manualEpgSources, allPlaylists);
-    const autoPlay = StorageService.getAutoPlay();
     const channelCycleMode = StorageService.getChannelCycleMode();
     const showHidden = StorageService.getShowHiddenChannels();
     const feedTime = StorageService.getTzMode() === 'feed';
@@ -939,14 +942,7 @@ export class Settings {
                   </div>
                   <div class="settings-item-hint">${t('settings.timeCorrectionHint')}</div>
                 </div>
-                <div class="settings-item settings-item--action">
-                  <div class="settings-item-title">${t('reminderManager.title')}</div>
-                  <button class="btn btn-secondary" data-focusable id="manage-reminders">
-                    ${t('settings.manageReminders', {
-                      count: ReminderService.listManageable().length,
-                    })}
-                  </button>
-                </div>
+                ${this.reminderItem()}
               </div>
             </div>
 
@@ -980,10 +976,6 @@ export class Settings {
             <div class="settings-category ${this.pageClass('playback')}" id="settings-playback" data-settings-category="playback">
               <div class="settings-section">
                 <h3 class="settings-section-title">${t('settings.playback')}</h3>
-                <div class="settings-item">
-                  <div class="settings-item-title">${t('settings.autoPlay')}</div>
-                  ${toggleGroup('auto-play', [{ value: 'on', label: t('settings.on') }, { value: 'off', label: t('settings.off') }], autoPlay ? 'on' : 'off')}
-                </div>
                 <div class="settings-item">
                   <div class="settings-item-title">${t('settings.channelCycleMode')}</div>
                   ${toggleGroup('channel-cycle-mode', [
@@ -1314,6 +1306,8 @@ export class Settings {
     playlists: PlaylistEntry[],
     selectedUrl?: string,
   ): Safe {
+    // The playlists' own guide sources arrive with the channels.
+    if (this.channelsLoading) return this.channelsLoadingHint();
     const selected = sources.some(source => source.url === selectedUrl)
       ? selectedUrl as string
       : sources[0]?.url;
@@ -1699,7 +1693,56 @@ export class Settings {
     }
   }
 
+  // The channels Settings opened before: the guide sources they bring, the
+  // health check, and Save wait for them, each showing so in place.
+  setChannelsLoading(loading: boolean): void {
+    if (this.channelsLoading === loading) return;
+    this.channelsLoading = loading;
+    if (this.container.querySelector('.epg-offset-editor')) {
+      this.refreshEpgOffsetEditor(this.manualEpgSourcesFromEditor(), this.currentEpgOffsetSource());
+      this.updateChannelHealthPanel();
+      const reminders = $('.reminders-item', this.container);
+      if (reminders) morph(reminders, this.reminderItem());
+    }
+    if (loading || !this.saveWhenChannelsLoad) return;
+    this.saveWhenChannelsLoad = false;
+    if (!this.container.classList.contains('hidden')) this.save();
+  }
+
+  setChannelsReady(ready: () => boolean): void {
+    this.channelsReady = ready;
+  }
+
+  // Without the channels every reminder looks orphaned, and counting them
+  // would prune them all, so the entry waits for the channels.
+  private reminderItem(): Safe {
+    return html`
+      <div class="settings-item settings-item--action reminders-item">
+        <div class="settings-item-title">${t('reminderManager.title')}</div>
+        ${!this.channelsReady()
+          ? this.channelsLoading ? this.channelsLoadingHint() : ''
+          : html`
+            <button class="btn btn-secondary" data-focusable id="manage-reminders">
+              ${t('settings.manageReminders', {
+                count: ReminderService.listManageable().length,
+              })}
+            </button>`}
+      </div>`;
+  }
+
+  private channelsLoadingHint(): Safe {
+    return html`<div class="settings-item-hint settings-channels-loading" role="status">${
+      t('app.loadingChannels')}</div>`;
+  }
+
   private channelHealthPanel(): Safe {
+    if (this.channelsLoading) {
+      return html`
+        <div class="settings-item settings-item--action channel-health-panel">
+          <div class="settings-item-title">${t('settings.channelHealth')}</div>
+          ${this.channelsLoadingHint()}
+        </div>`;
+    }
     const channels = PlaylistService.allChannels;
     const summary = ChannelHealthService.getSummary(channels);
     return html`
@@ -2854,6 +2897,13 @@ export class Settings {
   }
 
   private save(): void {
+    // Saving keys time corrections to the channels' guide sources, so it
+    // waits for the channels Settings opened before.
+    if (this.channelsLoading) {
+      this.saveWhenChannelsLoad = true;
+      showToast(t('app.loadingChannels'));
+      return;
+    }
     // Read row-by-row so each row's stable id (data-id) is preserved; a row
     // added before this build has none, so mint one.
     const rows = $$('#playlist-entries .settings-row:not(.playlist-header-row)', this.container) as HTMLElement[];
@@ -2952,9 +3002,6 @@ export class Settings {
 
     const previousManualEpgSources = StorageService.getManualEpgSources();
     StorageService.setManualEpgSources(manualEpgSources);
-
-    const autoPlayBtn = $('#auto-play .toggle-option.active', this.container);
-    if (autoPlayBtn) StorageService.setAutoPlay(autoPlayBtn.dataset.value === 'on');
 
     const channelCycleBtn = $('#channel-cycle-mode .toggle-option.active', this.container);
     if (channelCycleBtn?.dataset.value) {
@@ -3076,7 +3123,7 @@ export class Settings {
     if ($('#tmdb-key', this.container)) StorageService.setTmdbApiKey(osVal('tmdb-key'));
 
     // Source, EPG URL, and time correction changes rebuild loaded data. Display-only
-    // settings (time zone, auto-play) just re-render in place.
+    // settings (time zone, Channel Up/Down) just re-render in place.
     const sig = (l: PlaylistEntry[]) =>
       JSON.stringify(l.map(pl => [
         pl.id,

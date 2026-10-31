@@ -1,4 +1,4 @@
-import { test, expect, enterTab, isChromium53, showHome, type Page } from './helpers';
+import { test, expect, enterTab, isChromium53, type Page } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
 // Pages the catalog leaves must be freed: every visit rebuilds the rails, a
@@ -41,7 +41,6 @@ test('frees the catalog pages it leaves', async ({ page }) => {
   test.skip(isChromium53(), 'reads Blink counters through CDP, which the simulation adds nothing to');
   test.setTimeout(120_000);
   await seedXtream(page, { catalog: 'large' });
-  await showHome(page);
   await page.goto('/');
   await expect(page.locator('#view-home')).toBeVisible();
   const cdp = await page.context().newCDPSession(page);

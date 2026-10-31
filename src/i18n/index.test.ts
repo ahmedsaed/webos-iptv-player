@@ -228,7 +228,6 @@ describe('i18n', () => {
     expect(tp('channel.count', 5)).toBe('5 kanałów');
     expect(tp('channel.count', 12)).toBe('12 kanałów');
     expect(tp('channel.count', 22)).toBe('22 kanały');
-    expect(tp('app.channelsLoaded', 22)).toBe('Wczytano 22 kanały');
     expect(document.documentElement.lang).toBe('pl');
   });
 
@@ -241,7 +240,6 @@ describe('i18n', () => {
     expect(tp('channel.count', 11)).toBe('11 каналов');
     expect(tp('channel.count', 21)).toBe('21 канал');
     expect(tp('channel.count', 22)).toBe('22 канала');
-    expect(tp('app.channelsLoaded', 22)).toBe('Загружено 22 канала');
     expect(document.documentElement.lang).toBe('ru');
   });
 
@@ -250,7 +248,6 @@ describe('i18n', () => {
     expect(t('channel.recentlyWatched')).toBe('Son İzlenenler');
     expect(tp('channel.count', 1)).toBe('1 kanal');
     expect(tp('channel.count', 12)).toBe('12 kanal');
-    expect(tp('app.channelsLoaded', 12)).toBe('12 kanal yüklendi');
     expect(document.documentElement.lang).toBe('tr');
   });
 

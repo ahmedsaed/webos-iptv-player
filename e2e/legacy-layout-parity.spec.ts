@@ -1,4 +1,4 @@
-import { enterTab, openGuide, pressKeys, test, expect, isChromium53, neuterVideo, routeLiveManifest, routePlaylist, type Page } from './helpers';
+import { enterTab, openGuide, openLive, pressKeys, test, expect, isChromium53, neuterVideo, routeLiveManifest, routePlaylist, type Page } from './helpers';
 import { type Browser } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { findGappedLooseText, measureLooseText, newLegacyPage, pixelDiff } from './pixel-parity';
@@ -124,8 +124,8 @@ async function prepareM3U(page: Page): Promise<void> {
       startMs: Date.now() + 3600_000,
       stopMs: Date.now() + 7200_000,
     }]));
-    localStorage.setItem('iptv_epg_url', JSON.stringify('http://epg.example.com/guide.xml'));
-    localStorage.setItem('iptv_favorites', JSON.stringify(['one']));
+    localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: 'http://epg.example.com/guide.xml', playlistIds: [] }]));
+    localStorage.setItem('iptv_favorites', JSON.stringify([key]));
     // A half-watched past program, so the EPG offers to resume it.
     const start = Date.now() - 2 * 3600_000;
     const end = start + 3600_000;
@@ -138,7 +138,7 @@ async function prepareM3U(page: Page): Promise<void> {
     }));
   }, channelKey({ url: 'http://streams.example.com/one.m3u8' } as Channel));
   await page.goto('/');
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await openLive(page);
   await expect(page.locator('.channel-item')).toHaveCount(2);
 }
 
@@ -146,7 +146,7 @@ async function prepareXtream(page: Page): Promise<void> {
   await page.clock.setFixedTime(NOW);
   await seedXtream(page, { catalog: 'large' });
   await page.goto('/');
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await openLive(page);
 }
 
 // Wait out a smooth scroll so both engines are sampled at rest.
@@ -431,6 +431,7 @@ const M3U_SCREENS: Screen[] = [
     budget: 0,
     go: async (p) => {
       await p.reload();
+      await openLive(p);
       await expect(p.locator('.channel-item')).toHaveCount(2);
       await expect(p.locator('#live-preview .live-preview-channel')).toHaveText('Channel One');
       await p.locator('#video-player').evaluate((video) => {
@@ -443,7 +444,8 @@ const M3U_SCREENS: Screen[] = [
     },
   },
   {
-    // A due reminder prompts at boot, so this one arrives through a reload.
+    // A due reminder prompts at boot, over Home, so this one arrives
+    // through a reload.
     name: 'reminder-prompt',
     budget: 0,
     go: async (p) => {
@@ -517,12 +519,15 @@ const M3U_SCREENS: Screen[] = [
   },
   {
     // Last two: both reload with the playlist state rewritten.
-    name: 'loading',
+    // Live loads its channels when it opens from Home.
+    name: 'live-loading',
     budget: 0,
     go: async (p) => {
       await p.route('**/playlist.m3u', (r) => new Promise(() => { void r; }));
       await p.reload();
-      await expect(p.locator('#view-loading')).toBeVisible();
+      await expect(p.locator('#view-home [data-key="section:live"]')).toHaveClass(/\bfocused\b/);
+      await p.keyboard.press('Enter');
+      await expect(p.locator('#view-channels .live-load-status')).toBeVisible();
     },
   },
   {
@@ -533,7 +538,7 @@ const M3U_SCREENS: Screen[] = [
       // drop it from a later one, which runs after it.
       await p.addInitScript(() => localStorage.removeItem('iptv_playlists'));
       await p.reload();
-      await expect(p.locator('#view-settings')).toBeVisible();
+      await expect(p.locator('#view-home .home-view-first-run')).toBeVisible();
     },
   },
 ];

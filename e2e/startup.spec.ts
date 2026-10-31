@@ -8,6 +8,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 interface StartupProbe {
   starts: number;
   loadingAtStart: boolean[];

@@ -43,7 +43,6 @@ vi.mock('../services/epg-service', () => ({
 }));
 vi.mock('../services/storage-service', () => ({
   StorageService: {
-    setLastChannel: vi.fn(), setLastChannelKey: vi.fn(),
     setCatchupProgress: vi.fn(), setResume: vi.fn(),
     touchRecentlyWatchedLive: vi.fn(),
     getChannelCycleMode: vi.fn(() => 'global'),

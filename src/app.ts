@@ -71,7 +71,7 @@ import { getLocale, initLocale, resolveLocale, setLocale, t, tp } from './i18n';
 
 const log = createLogger('App');
 
-type ChannelLanding = 'launch' | 'channels' | 'section' | 'live' | 'quiet';
+type ChannelLanding = 'launch' | 'live' | 'quiet';
 type ViewName = 'home' | 'channels' | 'player' | 'settings' | 'parental-controls' | 'reminders'
   | 'loading' | 'movies' | 'series' | 'search';
 
@@ -141,8 +141,8 @@ class App {
   private channelLoad: Promise<void> | null = null;
   // A reload Home deferred still owes its forced guide refresh.
   private forceEpgOnLoad = false;
-  // Only the latest action waiting on the channels runs.
-  private channelWaiter = 0;
+  // Search opened before the channels: it opens its index once they load.
+  private searchWaitsForChannels = false;
   // Live shown before its channels: the mode it lands in once they load, and
   // what then runs. Leaving Live drops it.
   private livePending: { mode: LiveMode; then?: () => void; from: PlayedFrom } | null = null;
@@ -270,6 +270,7 @@ class App {
       (name, proceed) => this.authorizeLiveEditing(name, proceed),
       (id, proceed, turnOff) => this.authorizeSourceRemoval(id, proceed, turnOff),
     );
+    this.settings.setChannelsReady(() => this.channelsLoaded);
     this.parentalControls = new ParentalControls(
       this.views['parental-controls'],
       () => this.goUp('parental-controls'),
@@ -637,7 +638,13 @@ class App {
     if (this.enterChannelsAfterUploadSync &&
         StorageService.getPlaylists().length > 0) {
       this.enterChannelsAfterUploadSync = false;
-      await this.loadData(false, this.isCurrentView('home') ? 'launch' : 'channels');
+      if (this.isCurrentView('home')) {
+        await this.loadData(false, 'launch');
+      } else {
+        this.unloadChannels(false);
+        this.syncSources();
+        this.openLiveLoading('list');
+      }
     }
   }
 
@@ -926,19 +933,18 @@ class App {
     this.searchBox.setPlaceholder(!!account);
   }
 
-  // `launch`: the first load lands on Home, which only checks the connection
-  // (or on Live, by a hidden preference, or when auto-play resumes a channel);
-  // a reload stays on Live. `section` loads the channels for the section
-  // being opened, and `quiet` for a due reminder, without changing the view.
-  // `live` loads them for Live, which shows its own loading state and error.
+  // `launch` lands on Home, which loads no channels and only checks the
+  // connection. `live` loads them for Live, which shows its own loading
+  // state and error; `quiet` loads them behind Search, Settings, or a due
+  // reminder, without changing the view.
   private async loadData(
-    forceEpgRefresh = false,
-    landing: ChannelLanding = 'channels',
+    forceEpgRefresh: boolean,
+    landing: ChannelLanding,
   ): Promise<void> {
     const done = log.time('loadData');
     const quiet = landing === 'quiet';
     this.loadingData = !quiet;
-    if (!quiet && landing !== 'live') show(this.views.loading);
+    if (landing === 'launch') show(this.views.loading);
     this.stopEpgRefresh();
     this.stopPlaylistRefresh();
     if (this.playlistRefreshPromise) await this.playlistRefreshPromise;
@@ -948,7 +954,7 @@ class App {
     try {
       const playlists = StorageService.getPlaylists();
       log.info('Configured playlists:', playlists.length);
-      const firstRun = firstRunLanding(playlists, landing, StorageService.getStartOnLive());
+      const firstRun = firstRunLanding(playlists, landing);
       if (firstRun) {
         log.info('No playlists configured — opening', firstRun);
         this.connection.clear();
@@ -961,7 +967,7 @@ class App {
         // account avatars.
         this.syncSources();
         this.channelList.render();
-        // Home shows the first run; started on Live, Settings opens instead.
+        // Home shows the first run; a later load opens Settings instead.
         if (firstRun === 'home') {
           this.goHome();
         } else {
@@ -972,7 +978,7 @@ class App {
         return;
       }
 
-      if (landing === 'launch' && this.startsOnHome()) {
+      if (landing === 'launch') {
         this.unloadChannels(forceEpgRefresh);
         this.syncSources();
         this.channelList.render();
@@ -997,8 +1003,9 @@ class App {
         loadingText.textContent = text;
         this.channelList.showLoadProgress(text);
       });
-      // Live shows the failure with Try again instead of an empty list.
-      if (landing === 'live' && PlaylistService.loadFailed) {
+      // Live shows the failure with Try again instead of an empty list, and
+      // the next view to need the channels tries again.
+      if (PlaylistService.loadFailed) {
         throw new Error('Every playlist source failed to load');
       }
       this.player.syncCurrentIndex();
@@ -1021,39 +1028,13 @@ class App {
       this.channelList.setLoadState(null);
       this.syncSources();
 
-      if (landing === 'section' || landing === 'live' || quiet) {
-        this.channelList.render();
-      } else if (landing === 'launch' && !StorageService.getStartOnLive()) {
-        this.channelList.render();
-        this.goHome();
-      } else {
-        this.showView('channels');
-        this.channelList.render();
-      }
+      this.channelList.render();
 
-      // Live's header shows the count, so a load it shows needs no toast.
-      if (!quiet && landing !== 'live') {
-        showToast(tp('app.channelsLoaded', PlaylistService.channels.length));
-      }
-      // Let the load confirmation finish before a new-category notice replaces it.
+      // Let Live settle before a new-category notice shows.
       setTimeout(() => this.showLiveCategoryNotices(), 3000);
 
       this.scanReminders();
       ReminderService.reschedulePending();
-
-      if (StorageService.getAutoPlay() && (landing === 'launch' || landing === 'channels')) {
-        // The per-stream key survives customization and provider reshuffles.
-        const lastCh = PlaylistService.resolveLastChannelIndex(
-          StorageService.getLastChannelKey(),
-          StorageService.getLastChannel(),
-        );
-        const last = PlaylistService.channels[lastCh];
-        // A locked channel must not open a PIN prompt over a cold start.
-        if (last && ParentalControlService.decision(liveParentalRequest(last)).allowed) {
-          log.info('Auto-play resuming last channel index', lastCh);
-          this.playChannel(lastCh);
-        }
-      }
 
       if (epgSources.length) {
         if (forceEpgRefresh) {
@@ -1084,7 +1065,7 @@ class App {
       this.searchPrewarm.schedule('startup');
     } catch (err) {
       log.error('loadData failed:', err);
-      if (quiet || landing === 'live') return;
+      if (landing !== 'launch') return;
       this.showView('settings');
       this.settings.render();
       showToast(t('app.loadFailed'));
@@ -1095,11 +1076,6 @@ class App {
       }
       done();
     }
-  }
-
-  // Auto-play resumes a channel at launch, so it needs the channels at once.
-  private startsOnHome(): boolean {
-    return !StorageService.getStartOnLive() && !StorageService.getAutoPlay();
   }
 
   // Home starts with no channels; a reload drops any already loaded.
@@ -1113,7 +1089,7 @@ class App {
     this.forceEpgOnLoad = this.forceEpgOnLoad || forceEpgRefresh;
   }
 
-  private ensureChannels(landing: 'section' | 'live' | 'quiet' = 'section'): Promise<void> {
+  private ensureChannels(landing: 'live' | 'quiet'): Promise<void> {
     if (this.channelsLoaded) return Promise.resolve();
     if (!this.channelLoad) {
       const force = this.forceEpgOnLoad;
@@ -1122,20 +1098,6 @@ class App {
         .then(() => { this.channelLoad = null; });
     }
     return this.channelLoad;
-  }
-
-  // Run `action` once the channels are loaded, loading them first if Home
-  // skipped them. A failed load, a newer request, or a view change drops it.
-  private withChannels(action: () => void): void {
-    if (this.channelsLoaded) {
-      action();
-      return;
-    }
-    const waiter = ++this.channelWaiter;
-    const view = this.viewStack[this.viewStack.length - 1];
-    void this.ensureChannels().then(() => {
-      if (this.channelsLoaded && waiter === this.channelWaiter && this.isCurrentView(view)) action();
-    });
   }
 
   // Run `action` in Live: at once with the channels, else after Live has
@@ -1199,22 +1161,10 @@ class App {
   }
 
   // Settings' Sources page from Home: an Add flow, or the account a failed
-  // sign-in names. Settings needs the channels, which Home skipped; a load
-  // that fails opens Settings itself, and the account still gets the keys.
+  // sign-in names.
   private openSettingsAt(target: SourceTarget, via: 'key' | 'pointer'): void {
-    const open = (): void => {
-      if (!this.isCurrentView('settings')) this.selectSection('settings', via);
-      this.settings.openSource(target);
-    };
-    if (this.channelsLoaded) {
-      open();
-      return;
-    }
-    const waiter = ++this.channelWaiter;
-    void this.ensureChannels().then(() => {
-      if (waiter !== this.channelWaiter) return;
-      if (this.isCurrentView('home') || this.isCurrentView('settings')) open();
-    });
+    if (!this.isCurrentView('settings')) this.selectSection('settings', via);
+    this.settings.openSource(target);
   }
 
   // New Live categories are announced only over the channel list, never over
@@ -1434,11 +1384,35 @@ class App {
       return;
     }
     if (section === 'settings') {
-      this.settings.render();
-      this.showView('settings');
+      this.openSettings();
       return;
     }
     this.openSearch();
+  }
+
+  // Settings opens at once; what needs the channels waits for them in place.
+  private openSettings(): void {
+    this.loadChannelsBehind('settings');
+    this.settings.render();
+    this.showView('settings');
+  }
+
+  // Search and Settings open before the channels load: each shows the load
+  // where it needs them, and Back still goes Home.
+  private loadChannelsBehind(view: 'search' | 'settings'): void {
+    if (this.channelsLoaded) return;
+    if (view === 'settings') {
+      this.settings.setChannelsLoading(true);
+      void this.ensureChannels('quiet').then(() => this.settings.setChannelsLoading(false));
+      return;
+    }
+    this.search.showChannelsLoading();
+    if (this.searchWaitsForChannels) return;
+    this.searchWaitsForChannels = true;
+    void this.ensureChannels('quiet').then(() => {
+      this.searchWaitsForChannels = false;
+      if (this.isCurrentView('search')) this.openSearchIndex();
+    });
   }
 
   // An empty query box with the caret, and the recent searches under it.
@@ -1446,14 +1420,19 @@ class App {
     this.showView('search');
     this.lastSearchQuery = '';
     this.searchBox.setQuery('');
-    this.search.open(this.activeXtreamAccount())
+    if (this.channelsLoaded) this.openSearchIndex();
+    else this.loadChannelsBehind('search');
+    this.searchBox.focus();
+  }
+
+  private openSearchIndex(): void {
+    this.search.open(this.activeXtreamAccount(), this.lastSearchQuery)
       .catch((err) => log.error(
         'Search open failed',
         'event=xtream.view.open.failed',
         'operation=search',
         err,
       ));
-    this.searchBox.focus();
   }
 
   // The search box's query changed; an empty box shows the recent searches.
@@ -1568,10 +1547,6 @@ class App {
     if (!this.channelsLoaded && section === 'live') {
       this.openLiveLoading('list');
       if (via === 'pointer') FocusRing.defer('channels');
-      return;
-    }
-    if (!this.channelsLoaded && (section === 'search' || section === 'settings')) {
-      this.withChannels(() => this.selectSection(section, via));
       return;
     }
     this.switchSection(section);
@@ -1857,12 +1832,9 @@ class App {
       return;
     }
     if (action === 'blue' && currentView !== 'settings' && !editingChannels) {
-      this.withChannels(() => {
-        this.sidebar.hide();
-        this.player.stop();
-        this.settings.render();
-        this.showView('settings');
-      });
+      this.sidebar.hide();
+      this.player.stop();
+      this.openSettings();
       return;
     }
     if (action === 'green' && currentView === 'player'
@@ -2041,6 +2013,11 @@ class App {
 
   private async onSettingsSaved(action: SaveAction): Promise<void> {
     if (action === 'edit-channels') {
+      // Settings may have opened before the channels loaded.
+      if (!this.channelsLoaded) {
+        this.openLiveLoading('list', () => this.channelList.enterEditMode('builtin:all'));
+        return;
+      }
       this.showView('channels');
       this.channelList.render();
       this.channelList.enterEditMode('builtin:all');
@@ -2072,8 +2049,6 @@ class App {
     if (action === 'reload') {
       this.search.invalidateCatalog();
       await Promise.all([clearCachedPlaylist(), clearCachedCatalog()]);
-      this.showView('channels');
-      // 'launch' lands on the start screen (Home), as Settings was opened from it.
       await this.loadData(true, 'launch');
       return;
     }
@@ -2085,8 +2060,7 @@ class App {
       this.schedulePlaylistRefresh();
     }
     this.channelList.render();
-    if (StorageService.getStartOnLive()) this.showView('channels');
-    else this.goHome();
+    this.goHome();
   }
 }
 

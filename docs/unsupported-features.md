@@ -57,12 +57,3 @@ are webOS platform limitations; the rest are design choices.
   edge cases for a small gain, and remapping only some views would be
   confusing.
 
-- **Persistent date and time:** a permanent clock is intentionally omitted to
-  avoid distraction, screen obstruction, unnecessary updates, localization
-  complexity, and OLED burn-in risk. The current time is available in the live
-  player OSD.
-
-- **Home page:** a separate home page with section shortcuts is intentionally
-  omitted because it adds an extra step before reaching Live TV. The app opens
-  directly into a useful section and can play the last watched channel on
-  startup.

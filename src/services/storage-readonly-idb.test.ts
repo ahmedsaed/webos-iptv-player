@@ -254,7 +254,7 @@ describe('StorageService localStorage quota while IndexedDB is read-only', () =>
     limitLocalStorage(() => limit);
     limit = 0;
 
-    app.storage.setLastChannel(3);
+    app.storage.setEpgTzOffset(60);
 
     expect(await app.cache.getCachedStreamMime('host/a')).toBeNull();
   });

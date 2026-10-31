@@ -1,7 +1,6 @@
 import {
   test,
   expect,
-  showHome,
   seedPlaylist,
   pressKeys,
   enterTab,
@@ -39,7 +38,6 @@ function holdPlaylist(page: Page): { release: () => void; fail: boolean; request
 
 async function openHome(page: Page): Promise<void> {
   await seedPlaylist(page);
-  await showHome(page);
   await page.goto('/');
   await expect(page.locator('#view-home .focused')).toHaveAttribute('data-section', 'live');
 }
@@ -212,4 +210,130 @@ test('a click on the Live card shows the loading state, and the first key shows 
   await press(page, 'ArrowDown');
   await expect(rows(page).first()).toHaveClass(/\bfocused\b/);
   await expectRings(page, 1);
+});
+
+// Search and Settings opened before the channels load show at once, like
+// Live, rather than waiting behind Home with the load out of sight.
+
+const search = (page: Page) => page.locator('#view-search');
+const searchLoading = (page: Page) => search(page).locator('[data-search-busy="channels"]');
+const settings = (page: Page) => page.locator('#view-settings');
+
+test('Search opens at once while the channels load, and searches them once they do', async ({ page }) => {
+  const gate = holdPlaylist(page);
+  await openHome(page);
+  await enterTab(page, 'search');
+
+  await expect(search(page)).toBeVisible();
+  await expect(page.locator('#view-loading')).toBeHidden();
+  await expect(searchLoading(page)).toHaveText('Loading channels…');
+  await expect(page.locator('.search-box-input')).toBeFocused();
+  await page.locator('.search-box-input').fill('two');
+  await expect(searchLoading(page)).toBeVisible();
+
+  gate.release();
+  await expect(searchLoading(page)).toHaveCount(0);
+  await expect(search(page).locator('.search-results')).toContainText('Channel Two');
+});
+
+test('Back while Search loads goes Home, and the load does not pull Search back', async ({ page }) => {
+  const gate = holdPlaylist(page);
+  await openHome(page);
+  await enterTab(page, 'search');
+  await expect(searchLoading(page)).toBeVisible();
+
+  await pressKeys(page, 461);
+  await expect(page.locator('#view-home')).toBeVisible();
+  await expect(search(page)).toBeHidden();
+
+  gate.release();
+  await expect.poll(() => gate.requests).toBe(1);
+  await page.waitForTimeout(500);
+  await expect(page.locator('#view-home')).toBeVisible();
+  await expect(search(page)).toBeHidden();
+});
+
+test('Settings opens at once while the channels load; only what needs them waits', async ({ page }) => {
+  const gate = holdPlaylist(page);
+  await openHome(page);
+  await enterTab(page, 'settings');
+
+  await expect(settings(page)).toBeVisible();
+  await expect(page.locator('#view-home')).toBeHidden();
+  await expect(page.locator('#view-loading')).toBeHidden();
+  await expect(settings(page).locator('#app-language')).toBeVisible();
+  // The playlist's own guide source and the health check need the channels.
+  await settings(page).locator('[data-settings-target="guide"]').click();
+  const editor = settings(page).locator('.epg-offset-editor');
+  await expect(editor.locator('.settings-channels-loading')).toHaveText('Loading channels…');
+  await settings(page).locator('[data-settings-target="sources"]').click();
+  const health = settings(page).locator('.channel-health-panel');
+  await expect(health.locator('.settings-channels-loading')).toHaveText('Loading channels…');
+  await expect(health.locator('#check-channel-health')).toHaveCount(0);
+
+  gate.release();
+  await expect(health.locator('#check-channel-health')).toBeVisible();
+  await settings(page).locator('[data-settings-target="guide"]').click();
+  await expect(editor.locator('.settings-channels-loading')).toHaveCount(0);
+  await expect(editor.locator('#epg-offset-source')).toBeVisible();
+});
+
+// Before its channels load every reminder looks orphaned; counting them then
+// would prune them all.
+test('Settings keeps reminders while its channels load, then counts them', async ({ page }) => {
+  const gate = holdPlaylist(page);
+  await page.addInitScript(() => {
+    const url = 'http://streams.example.com/one.m3u8';
+    let h = 0x811c9dc5;
+    for (let i = 0; i < url.length; i++) { h ^= url.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    const now = Date.now();
+    localStorage.setItem('iptv_reminders', JSON.stringify([{
+      // No padStart: the init script runs with Chromium 53's APIs in the simulation.
+      channelKey: `0000000${(h >>> 0).toString(16)}`.slice(-8), channelName: 'Channel One',
+      title: 'Alpha', startMs: now + 3600_000, stopMs: now + 7200_000,
+    }]));
+  });
+  await openHome(page);
+  await enterTab(page, 'settings');
+  await settings(page).locator('[data-settings-target="guide"]').click();
+  const entry = settings(page).locator('.reminders-item');
+  await expect(entry.locator('.settings-channels-loading')).toHaveText('Loading channels…');
+  await expect(entry.locator('#manage-reminders')).toHaveCount(0);
+
+  gate.release();
+  await expect(entry.locator('#manage-reminders')).toContainText('(1)');
+});
+
+test('Save while Settings waits for the channels saves once they load', async ({ page }) => {
+  const gate = holdPlaylist(page);
+  await openHome(page);
+  await enterTab(page, 'settings');
+  await settings(page).locator('[data-settings-target="appearance"]').click();
+  await settings(page).locator('.theme-swatch[data-theme-id="arctic"]').click();
+  await settings(page).locator('#save-settings').click();
+  await expect(page.locator('.toast.visible')).toContainText('Loading channels…');
+  await expect(settings(page)).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('iptv_theme'))).not.toBe('"arctic"');
+
+  gate.release();
+  await expect(page.locator('#view-home')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('iptv_theme'))).toBe('"arctic"');
+});
+
+test('Back while Settings loads goes Home, and the load does not pull Settings back', async ({ page }) => {
+  const gate = holdPlaylist(page);
+  await openHome(page);
+  await pressKeys(page, 406);
+  await expect(settings(page)).toBeVisible();
+  await expect(page.locator('#view-home')).toBeHidden();
+
+  await pressKeys(page, 461);
+  await expect(page.locator('#view-home')).toBeVisible();
+  await expect(settings(page)).toBeHidden();
+
+  gate.release();
+  await expect.poll(() => gate.requests).toBe(1);
+  await page.waitForTimeout(500);
+  await expect(page.locator('#view-home')).toBeVisible();
+  await expect(settings(page)).toBeHidden();
 });

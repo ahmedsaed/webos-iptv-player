@@ -84,19 +84,21 @@ This is the complete active key inventory:
 | Key | Type | Stored content | Classification |
 | --- | --- | --- | --- |
 | `iptv_playlists` | `PlaylistEntry[]` | Stable id, display name, source URL/type, uploaded channel count, and Xtream username, password, and live-output preference | Configuration |
-| `iptv_epg_url` | `string` | Manually configured XMLTV URL | Configuration |
-| `iptv_last_channel` | `number` | Last played channel's array index | Navigation state |
-| `iptv_last_channel_key` | `string` | Stable key of the last played channel; survives source reordering | Navigation state |
+| `iptv_manual_epg_sources` | `ManualEpgSource[]` | Manually added XMLTV URLs, in priority order, each applied to all playlists or to the listed playlist ids | Configuration |
 | `iptv_selectedXtream` | `string \| null` | Account id used by Movies, Series, and Search | Navigation state |
+| `iptv_catalog_sort_vod`, `iptv_catalog_sort_series` | `{by, direction}` | Movies and Series sort field (`default`, `name`, `added`, `rating`, `year`) and direction | Preference |
 | `iptv_show_hidden_channels` | `boolean` | Whether normal lists reveal hidden channels in a dimmed state | Preference |
-| `iptv_auto_play` | `boolean` | Whether startup automatically plays the selected channel | Preference |
+| `iptv_channel_cycle_mode` | `global \| active` | Whether Channel Up/Down cycles the whole list or stays in the group, Favorites, or playlist a channel was tuned from; default `active` | Preference |
 | `iptv_live_reconnect_attempts` | `number` | Live channel reconnection limit (0–5; default 3) | Preference |
+| `iptv_player_osd_timeout_ms` | `number` | How long the player controls stay up: 3000, 5000, 8000, 10000, or 12000 ms; default 5000 | Preference |
+| `iptv_number_entry_osd_timeout_ms` | `number` | How long the number-entry overlay stays up after a digit: 1200, 1800, 2500, 3000, or 3500 ms; default 1200 | Preference |
 | `iptv_playlist_refresh_interval_hours` | `number` | Channel-list refresh interval: 0 (off), 1, 3, 6, 12, or 24 hours; default 6 | Preference |
 | `iptv_epg_refresh_interval_hours` | `number` | Program-guide refresh interval: 0 (off), 1, 3, 6, 12, or 24 hours; default 6 | Preference |
 | `iptv_xtream_catalog_refresh_interval_hours` | `number` | Xtream Movies, Series, and Search catalog interval: 1, 3, 6, 12, or 24 hours; default 6 | Preference |
 | `iptv_locale` | `string` | Explicit interface locale or `system` | Preference |
 | `iptv_theme` | `string` | Selected application theme id | Preference |
 | `iptv_text_size` | `string` | Selected text-scale id | Preference |
+| `iptv_interface_size` | `90 \| 100 \| 110 \| 120 \| 130` | Whole-interface scale in percent | Preference |
 | `iptv_animation_mode` | `essential \| reduced \| full` | Animation profile; defaults to immediate navigation scrolling, while Essential disables costly motion for older TVs | Preference |
 | `iptv_overlay_style` | `dark \| frosted` | Player OSD/sidebar/picker glass style | Preference |
 | `iptv_tz_mode` | `device \| feed` | Which time zone displays EPG times | Preference |
@@ -104,6 +106,7 @@ This is the complete active key inventory:
 | `iptv_epg_offsets` | `Record<string, number>` | User time correction in minutes, keyed by EPG source URL | Preference |
 | `iptv_online_subtitles` | `OnlineSubtitleConfig` | Preferred language; SubDL and Assrt API keys; OpenSubtitles API key, username, password, access token, and token timestamp | Configuration and credentials |
 | `iptv_tmdb_api_key` | `string` | The user's own TMDB v3 API key or v4 read access token for cast photos; empty means the app never contacts TMDB | Configuration and credentials |
+| `iptv_parental_throttle` | `{failures, lockouts, blockedUntil}` | Wrong-PIN count and lockout end, kept here so restarting the app cannot reset the retry delay | Security state |
 | `iptv_log_level` | `string` | Optional runtime logger threshold used by diagnostics | Developer preference |
 | `iptv_fb_<store>` | `{r, d}` | Personal records kept while IndexedDB refuses writes, one key per user-data store (see [When IndexedDB refuses writes](#when-indexeddb-refuses-writes)) | Personal data fallback |
 

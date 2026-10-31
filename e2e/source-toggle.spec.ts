@@ -1,12 +1,16 @@
 import {
   expect,
   enterTab,
+  liveAfterSave,
   routeLiveManifest,
   routePlaylist,
   SAMPLE_M3U,
   seedPlaylist,
   test,
 } from './helpers';
+
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
 
 test('disabling every M3U source hides channels until the source is enabled again', async ({
   page,
@@ -60,7 +64,7 @@ test('disabling every M3U source hides channels until the source is enabled agai
   await sourceToggle.click();
   await page.locator('#save-settings').click();
 
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await liveAfterSave(page);
   await expect(page.locator('.channel-main .channel-item')).toHaveCount(0);
   await expect(page.locator('.empty-state'))
     .toContainText('No sources are enabled. Enable one in Settings.');
@@ -73,7 +77,7 @@ test('disabling every M3U source hides channels until the source is enabled agai
   await page.locator('#playlist-entries .source-toggle').click();
   await page.locator('#save-settings').click();
 
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await liveAfterSave(page);
   await expect(page.locator('.channel-main .channel-item')).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => {
     const sources = JSON.parse(localStorage.getItem('iptv_playlists') || '[]');
@@ -121,8 +125,7 @@ test('disabling the only Xtream account hides its sections until re-enabled', as
   await page.locator('#xtream-entries .source-toggle').click();
   await page.locator('#save-settings').click();
 
-  await expect(page.locator('#view-channels')).toBeVisible();
-  await enterTab(page, 'home');
+  await expect(page.locator('#view-home')).toBeVisible();
   await expect(page.locator('[data-section="movies"]')).toHaveCount(0);
   await expect(page.locator('[data-section="series"]')).toHaveCount(0);
   await expect(page.locator('.account-avatar')).toHaveCount(0);
@@ -131,8 +134,7 @@ test('disabling the only Xtream account hides its sections until re-enabled', as
   await page.locator('#xtream-entries .source-toggle').click();
   await page.locator('#save-settings').click();
 
-  await expect(page.locator('#view-channels')).toBeVisible();
-  await enterTab(page, 'home');
+  await expect(page.locator('#view-home')).toBeVisible();
   await expect(page.locator('#view-home .home-card[data-section="movies"]')).toHaveCount(1);
   await expect(page.locator('#view-home .home-card[data-section="series"]')).toHaveCount(1);
   await expect(page.locator('.home-account .account-avatar')).toHaveCount(1);

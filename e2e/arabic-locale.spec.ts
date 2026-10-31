@@ -10,6 +10,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 const PLAYLIST_URL = 'http://host/playlist.m3u';
 const GUIDE_URL = 'http://host/guide.xml';
 const CHANNELS = [
@@ -37,7 +40,7 @@ async function setup(page: Page, options: { offset?: number } = {}): Promise<voi
   await page.route(GUIDE_URL, route => route.fulfill({ contentType: 'application/xml', body: EPG }));
   await page.addInitScript(({ playlist, guide, offset }) => {
     localStorage.setItem('iptv_playlists', JSON.stringify([{ id: 'p1', name: 'P1', url: playlist }]));
-    localStorage.setItem('iptv_epg_url', JSON.stringify(guide));
+    localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: guide, playlistIds: [] }]));
     localStorage.setItem('iptv_tz_mode', JSON.stringify('device'));
     localStorage.setItem('iptv_locale', JSON.stringify('ar'));
     if (offset) localStorage.setItem('iptv_epg_offsets', JSON.stringify({ [guide]: offset }));

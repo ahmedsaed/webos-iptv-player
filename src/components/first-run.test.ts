@@ -6,17 +6,16 @@ const playlist: PlaylistEntry = { id: 'p1', name: 'P1', url: 'http://host/a.m3u'
 
 describe('firstRunLanding', () => {
   it('is no first run once any source exists, even a turned-off one', () => {
-    expect(firstRunLanding([playlist], 'launch', false)).toBeNull();
-    expect(firstRunLanding([{ ...playlist, enabled: false }], 'launch', false)).toBeNull();
+    expect(firstRunLanding([playlist], 'launch')).toBeNull();
+    expect(firstRunLanding([{ ...playlist, enabled: false }], 'launch')).toBeNull();
   });
 
   it('shows the first run on Home at launch', () => {
-    expect(firstRunLanding([], 'launch', false)).toBe('home');
+    expect(firstRunLanding([], 'launch')).toBe('home');
   });
 
-  it('opens Settings when started on Live or for a later load', () => {
-    expect(firstRunLanding([], 'launch', true)).toBe('settings');
-    expect(firstRunLanding([], 'channels', false)).toBe('settings');
-    expect(firstRunLanding([], 'section', false)).toBe('settings');
+  it('opens Settings for a later load', () => {
+    expect(firstRunLanding([], 'quiet')).toBe('settings');
+    expect(firstRunLanding([], 'live')).toBe('settings');
   });
 });

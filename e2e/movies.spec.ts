@@ -1,6 +1,9 @@
 import { test, expect, routeLiveManifest, neuterVideo, SAMPLE_M3U, enterTab, leaveVod, type Page, pressStepsAndReadPlayer, openGuide } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // A minimal ASS body with one dialogue active from t=0, so assjs renders it as
 // soon as it initializes over the (paused, t=0) video.
 const SAMPLE_ASS = [

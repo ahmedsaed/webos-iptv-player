@@ -1,6 +1,9 @@
 import { test, expect, enterTab, type Page, openGuide } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // TV lists show no scrollbar: focus moving down a list already says it scrolls.
 
 // Headless Chromium hides scrollbars by default, which would hide a regression.

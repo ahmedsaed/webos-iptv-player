@@ -1,4 +1,5 @@
 import {
+  liveAfterSave,
   test,
   expect,
   enterTab,
@@ -8,6 +9,9 @@ import {
   type Page,
 } from './helpers';
 import { THEMES, TEXT_SIZES } from '../src/config/themes';
+
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
 
 const CHANNELS = [
   '#EXTM3U',
@@ -67,7 +71,7 @@ async function setup(
       localStorage.setItem('iptv_playlists', JSON.stringify([
         { id: 'p1', name: 'P1', url: 'http://host/playlist.m3u' },
       ]));
-      localStorage.setItem('iptv_epg_url', JSON.stringify('http://host/guide.xml'));
+      localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: 'http://host/guide.xml', playlistIds: [] }]));
       localStorage.setItem('iptv_tz_mode', JSON.stringify('device'));
       sessionStorage.setItem('preview-seeded', 'true');
     }
@@ -485,6 +489,47 @@ test('waiting or a failed manifest retains the preview slot and channel identity
   expect(await page.locator('.live-preview-slot').boundingBox()).toEqual(before);
 });
 
+// Regression: once live recovery ran out, the preview zapped to the next
+// channel while focus stayed on the dead row. On the TV a dead stream
+// reaches the player as the native <video> error event.
+test('a dead previewed channel shows its failure on its row instead of zapping', async ({ page }) => {
+  const events: string[] = [];
+  page.on('console', (msg) => events.push(msg.text()));
+  await page.addInitScript(() => {
+    localStorage.setItem('iptv_live_reconnect_attempts', JSON.stringify(0));
+  });
+  await setup(page);
+  await selectFirst(page);
+  await expect.poll(async () => (await snapshot(page)).source).toBe('http://host/ch1.m3u8');
+
+  await page.locator('#video-player').evaluate(video => video.dispatchEvent(new Event('error')));
+  // One reconnect at most, then recovery runs out: the row keeps its channel.
+  await expect(page.locator(`${PANEL} .live-preview-message`)).toHaveText('Unavailable', { timeout: 10_000 });
+  await expect.poll(() => events.some(text => text.includes('event=playback.recovery.exhausted')
+    && text.includes('outcome=preview-failed'))).toBe(true);
+  // Well past the error's 2 s advance: nothing zaps.
+  await page.waitForTimeout(3000);
+  await expect(page.locator(`${PANEL} .live-preview-channel`)).toHaveText('ch1');
+  await expect(page.locator(`${PANEL} .live-preview-message`)).toHaveText('Unavailable');
+  await expect(page.locator(`${ROW}.focused`)).toContainText('ch1');
+  expect((await snapshot(page)).source).toBe('http://host/ch1.m3u8');
+  await expect(page.locator('#view-player')).toBeHidden();
+});
+
+test('full screen still moves on from a dead channel once recovery runs out', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('iptv_live_reconnect_attempts', JSON.stringify(0));
+  });
+  await setup(page);
+  await selectFirst(page);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#view-player')).toBeVisible();
+  await page.locator('#video-player').evaluate(video => video.dispatchEvent(new Event('error')));
+  await expect.poll(async () => (await snapshot(page)).source, { timeout: 10_000 })
+    .toBe('http://host/ch2.m3u8');
+  await expect(page.locator('#view-player')).toBeVisible();
+});
+
 test('EPG shows the current program, up to four future rows, and the favorite mark', async ({ page }) => {
   await setup(page, { epg: true });
   await expect(page.locator(ROW).first()).toContainText('Program 1');
@@ -596,7 +641,7 @@ test('disabling the playing source in Settings leaves no preview', async ({ page
   await page.locator('[data-settings-target="sources"]').click();
   await page.locator('#playlist-entries .source-toggle').click();
   await page.locator('#save-settings').click();
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await liveAfterSave(page);
   await expect(page.locator(PANEL)).toBeHidden();
   await expect(page.locator(ROW)).toHaveCount(0);
   await expect(page.locator('#view-channels')).not.toHaveClass(/has-live-preview/);
@@ -619,6 +664,7 @@ test.describe('display timezone', () => {
     await page.locator('[data-settings-target="guide"]').click();
     await page.locator('#tz-mode [data-value="feed"]').click();
     await page.locator('#save-settings').click();
+    await liveAfterSave(page);
     await selectFirst(page);
     await expect(page.locator(`${PANEL} .live-preview-program time`).first())
       .toHaveText('13:00–14:00');

@@ -217,6 +217,9 @@ export class Search {
   // Shared by a reopen, so closing Search does not restart the load.
   private catalogLoad: { accountId: string; promise: Promise<CatalogSources> } | null = null;
   private catalogLoading = false;
+  // Opened before the channels load: the results area says so until the
+  // app opens the index over them.
+  private channelsLoading = false;
   // Until every source is indexed, queries wait and the results show a hint.
   private pendingIndex: PendingIndex | null = null;
   private active = false;
@@ -296,7 +299,13 @@ export class Search {
       .find((item) => item.dataset.key === key) ?? null;
   }
 
+  showChannelsLoading(): void {
+    this.channelsLoading = true;
+    this.render();
+  }
+
   async open(account: PlaylistEntry | null, query = ''): Promise<void> {
+    this.channelsLoading = false;
     this.active = true;
     // Another task may have started a new, empty worker since the index was built.
     const generation = appWorkerGeneration();
@@ -488,6 +497,7 @@ export class Search {
 
   deactivate(): void {
     this.active = false;
+    this.channelsLoading = false;
     this.focusPending = false;
     this.programIndexGeneration++;
     this.recoveryRetry = null;
@@ -1199,6 +1209,10 @@ export class Search {
     const query = this.query;
     const sessionId = this.workerSession;
     if (!query.trim()) return;
+    if (this.channelsLoading) {
+      this.render();
+      return;
+    }
     if (this.pendingIndex) {
       // The ready index runs this query; until then the hint stands in.
       if (!this.indexStats.hintAt) this.indexStats.hintAt = Date.now();
@@ -1703,8 +1717,15 @@ export class Search {
     const q = this.query.trim();
     const hasResults = this.visibleChannels.length > 0 || this.visiblePrograms.length > 0
       || this.visibleMovies.length > 0 || this.visibleSeries.length > 0;
-    this.indicator.set(!q ? null : this.pendingIndex ? 'preparing' : this.queryPending ? 'searching' : null);
-    const resultsBody = !q
+    this.indicator.set(!q || this.channelsLoading ? null
+      : this.pendingIndex ? 'preparing' : this.queryPending ? 'searching' : null);
+    const resultsBody = this.channelsLoading
+      ? html`
+          <div class="search-busy" role="status" data-search-busy="channels">
+            <span class="search-busy-spinner" aria-hidden="true"></span>
+            <span class="search-busy-text">${t('app.loadingChannels')}</span>
+          </div>`
+      : !q
       ? this.recentSection()
       : this.pendingIndex || this.queryPending
         ? this.busyIndicator()

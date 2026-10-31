@@ -1,7 +1,11 @@
 import {
+  liveAfterSave,
   test, expect, enterTab, openGuide, pressKeys, routePlaylist, seedPlaylist, type Page,
 } from './helpers';
 import { seedXtream } from './fixtures/xtream';
+
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
 
 const SIZES = ['90', '110', '120', '130'] as const;
 
@@ -171,7 +175,7 @@ test('the interface size previews live, reverts on Cancel, and persists on Save'
   await page.locator('#interface-size .dropdown-trigger').click();
   await page.locator('#interface-size .dropdown-option[data-dropdown-value="120"]').click();
   await page.locator('#save-settings').click();
-  await expect(page.locator('#view-channels')).toBeVisible();
+  await liveAfterSave(page);
   await expect(root).toHaveAttribute('data-interface-size', '120');
 
   await page.reload();

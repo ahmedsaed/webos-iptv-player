@@ -1,6 +1,9 @@
 import { test, expect, leaveLive, routePlaylist, seedPlaylist, type Page } from './helpers';
 import { DASH_URL, DASH_M3U, DASH_MPD, installShakaStub, startDash, expectDrmPills } from './shaka-fixture';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 async function captureDiagnostics(page: Page) {
   const { assembleDiagnosticReport, formatDiagnosticSummary, eventField } = await import('../scripts/tv-diag.mjs');
   const { normalizeCdpLogEvent } = await import('../scripts/cdp-logs.mjs');

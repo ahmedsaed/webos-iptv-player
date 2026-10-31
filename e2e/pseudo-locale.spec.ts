@@ -8,6 +8,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 async function textOverflow(page: Page, selector: string): Promise<string[]> {
   return page.locator(selector).evaluateAll((elements) => elements
     .filter((element) => {

@@ -8,6 +8,9 @@ import {
   openGuide,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 function xmltvDate(date: Date): string {
   return date.toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000';
 }
@@ -91,7 +94,7 @@ test('M3U channel results sit above matching programmes', async ({ page }) => {
     localStorage.setItem('iptv_playlists', JSON.stringify([
       { name: 'P', url: 'http://host/playlist.m3u' },
     ]));
-    localStorage.setItem('iptv_epg_url', JSON.stringify('http://host/guide.xml'));
+    localStorage.setItem('iptv_manual_epg_sources', JSON.stringify([{ url: 'http://host/guide.xml', playlistIds: [] }]));
   });
   await page.goto('/');
   await expect(page.locator('#view-channels')).toBeVisible();

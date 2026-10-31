@@ -1,6 +1,9 @@
 import { test, expect, routeLiveManifest, neuterVideo, SAMPLE_M3U, enterTab } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // Seed one Xtream account (enables Movies and Series) and stub the player_api.php
 // series calls + the get.php/xmltv.php the live path uses.
 async function seedSeries(

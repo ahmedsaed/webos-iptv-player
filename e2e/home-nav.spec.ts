@@ -1,4 +1,4 @@
-import { test, expect, showHome, enterTab, type Page } from './helpers';
+import { test, expect, enterTab, type Page } from './helpers';
 import { seedXtream } from './fixtures/xtream';
 
 // Pleione's TV navigation: Home first, sections full screen, and Back one
@@ -12,7 +12,6 @@ const card = (page: Page, section: string) => page.locator(`.home-card[data-sect
 // One Xtream account, on Pleione's Home.
 async function seedHome(page: Page): Promise<void> {
   await seedXtream(page);
-  await showHome(page);
 }
 
 // Home is up and Live has the keys.
@@ -350,7 +349,6 @@ test('Back on Home closes the app instead of raising the launcher through platfo
 });
 
 test('first run shows the welcome, phone setup, and the two Add cards, Add Xtream focused', async ({ page }) => {
-  await showHome(page);
   await page.goto('/');
   await expect(page.locator('#view-home')).toBeVisible();
   await expect(page.locator('.home-welcome-title')).toHaveText('Welcome to Pleione');
@@ -370,7 +368,6 @@ test('first run shows the welcome, phone setup, and the two Add cards, Add Xtrea
 });
 
 test('the first-run cards open the Add flows by D-pad and pointer', async ({ page }) => {
-  await showHome(page);
   await page.goto('/');
   await expect(homeFocus(page)).toHaveAttribute('data-key', 'add:xtream');
   await press(page, 'Enter');
@@ -396,7 +393,6 @@ test('the first-run cards open the Add flows by D-pad and pointer', async ({ pag
 });
 
 test('first run shows the phone setup the LAN service offers', async ({ page }) => {
-  await showHome(page);
   // The later route wins: /info over the catch-all.
   await page.route('http://127.0.0.1:9999/**', (r) => r.fulfill({
     status: 200, contentType: 'application/json', body: '[]' }));
@@ -448,7 +444,6 @@ test('the pointer resting at the left edge reveals nothing', async ({ page }) =>
 
 test('the account switcher on Home switches the account', async ({ page }) => {
   await seedXtream(page);
-  await showHome(page);
   await page.addInitScript(() => {
     const list = JSON.parse(localStorage.getItem('iptv_playlists')!) as unknown[];
     list.push({ id: 'x2', name: 'Y Account', url: 'http://host.example.com:8081',
@@ -594,7 +589,6 @@ test('in pointer mode each section offers a Home button; keys hide it', async ({
 // re-renders that wheel steps and arriving rail data cause.
 test('the Movies hero follows the lit tile through re-renders, by pointer and by key', async ({ page }) => {
   await seedXtream(page, { catalog: 'large' });
-  await showHome(page);
   await goHome(page);
   await enterTab(page, 'movies');
   const view = page.locator('#view-movies .catalog-layer-browse');

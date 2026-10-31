@@ -318,7 +318,8 @@ export class LivePreview {
     const favorite = this.options.isFavorite(state.channel);
     const message = state.status === 'loading' ? t('common.loading')
       : state.status === 'buffering' ? t('preview.connecting')
-      : state.status === 'error' ? t('player.streamError') : '';
+      // The preview stays on a dead channel rather than moving on.
+      : state.status === 'error' ? t('channel.healthUnavailable') : '';
     morph(this.container, html`
       <div class="live-preview-heading" data-key="preview-heading">
         <span class="live-preview-channel">${state.channel.name}</span>

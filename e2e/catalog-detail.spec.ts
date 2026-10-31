@@ -1,5 +1,8 @@
 import { test, expect, enterTab, routeLiveManifest, neuterVideo, SAMPLE_M3U, type Page } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // The movie and series detail pages: a hero whose blocks keep their place
 // whatever text arrives, an actions row, and rows for episodes, cast, and
 // titles like this one.

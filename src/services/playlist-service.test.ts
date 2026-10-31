@@ -6,7 +6,6 @@ const { storageMock, cacheMock, fetchTextMock } = vi.hoisted(() => ({
   storageMock: {
     getPlaylists: vi.fn(),
     getFavorites: vi.fn(() => [] as string[]),
-    migrateFavoriteKeys: vi.fn(),
     getShowHiddenChannels: vi.fn(() => false),
     getChannelCustomization: vi.fn(() => null),
     getPlaylistRefreshIntervalMs: vi.fn(() => 6 * 60 * 60 * 1000),
@@ -1563,47 +1562,6 @@ describe('PlaylistService customization', () => {
     expect(PlaylistService.indexOfKey(KEY_B)).toBe(0);
     expect(PlaylistService.indexOfKey('missing')).toBe(-1);
     expect(PlaylistService.getByIndex(0)?.name).toBe('Bravo');
-  });
-
-  it('prefers the channel key and uses the legacy index only without one', async () => {
-    await PlaylistService.refresh();
-    const savedKey = channelKey(PlaylistService.channels[1]);
-
-    expect(PlaylistService.resolveLastChannelIndex(savedKey, 0)).toBe(1);
-    expect(PlaylistService.resolveLastChannelIndex('missing', 0)).toBe(-1);
-    expect(PlaylistService.resolveLastChannelIndex('', 1)).toBe(1);
-  });
-
-  it('resolves query-distinguished streams precisely for autoplay', () => {
-    PlaylistService.channels = [
-      channel({ url: 'http://host/stream?id=1' }),
-      channel({ url: 'http://host/stream?id=2' }),
-    ];
-
-    const second = channelKey(PlaylistService.channels[1]);
-    expect(PlaylistService.resolveLastChannelIndex(second, 0)).toBe(1);
-  });
-
-  it('uses a stable query identity after a stream token rotates', () => {
-    PlaylistService.channels = [
-      channel({ url: 'http://host/stream?id=1&token=B' }),
-      channel({ url: 'http://host/stream?id=2&token=B' }),
-    ];
-    const old = channel({ url: 'http://host/stream?id=2&token=A' });
-
-    expect(PlaylistService.resolveLastChannelIndex(channelKey(old), 0)).toBe(1);
-  });
-
-  it('does not use an ambiguous legacy autoplay key', () => {
-    PlaylistService.channels = [
-      channel({ url: 'http://host/stream?id=1' }),
-      channel({ url: 'http://host/stream?id=2' }),
-    ];
-
-    expect(PlaylistService.resolveLastChannelIndex(
-      legacyChannelKey(PlaylistService.channels[1]),
-      0,
-    )).toBe(-1);
   });
 
   it('keeps empty custom groups in global navigation only', async () => {

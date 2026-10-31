@@ -9,6 +9,9 @@ import {
   type Page,
 } from './helpers';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 // A TV whose free disk fell below Chromium's system reserve after the app
 // was set up: every IndexedDB put aborts with QuotaExceededError once the
 // session flag is set, as on each launch from then on.

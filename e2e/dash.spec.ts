@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { test, expect, isChromium53, routePlaylist, seedPlaylist } from './helpers';
 import { DASH_URL, DASH_M3U, DASH_MPD, installShakaStub } from './shaka-fixture';
 
+// Opened from Home's Live card after every load (see `startOn`).
+test.use({ startOn: 'live' });
+
 const shakaVersion = JSON.parse(readFileSync('package.json', 'utf8')).devDependencies['shaka-player'];
 
 test('routes an MPD through Shaka and renders its stream info', async ({ page }) => {
